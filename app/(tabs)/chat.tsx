@@ -21,10 +21,14 @@ import * as Notifications from 'expo-notifications';
 import {db} from '@/config/firebase';
 import {
   collection,
+  doc,
   onSnapshot,
   query,
   orderBy,
   addDoc,
+  updateDoc,
+  getDoc,
+  deleteDoc,
   serverTimestamp,
   getDocs,
   where,
