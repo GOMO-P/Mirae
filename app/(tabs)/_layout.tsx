@@ -36,6 +36,13 @@ export default function TabLayout() {
           title: 'Friends',
           tabBarIcon: ({color}) => <IconSymbol size={28} name="person.2" color={color} />,
         }}
+        />
+      <Tabs.Screen
+        name="ranking"
+        options={{
+          title: 'Ranking',
+          tabBarIcon: ({color}) => <IconSymbol size={28} name="trophy.fill" color={color} />,
+        }}
       />
       <Tabs.Screen
         name="profile"
@@ -52,6 +59,18 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="memo"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="study-cert"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="study-feed"
         options={{
           href: null,
         }}
