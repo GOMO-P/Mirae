@@ -1,0 +1,180 @@
+# GOMO - Group Management App 
+
+React Native (Expo) 기반의 그룹 관리 모바일 애플리케이션입니다.
+
+##  프로젝트 소개
+
+GOMO는 사용자들이 다양한 주제의 그룹을 만들고, 검색하고, 참여할 수 있는 소셜 그룹 관리 플랫폼입니다.
+
+### 주요 기능
+
+- 👌🏻 **사용자 인증** - Firebase를 이용한 회원가입/로그인/로그아웃
+- 👍🏻 **그룹 탐색** - 이달의 그룹, 인기있는 그룹 목록 조회
+- ✌🏻 **프로필 관리** - 사용자 프로필, 팔로워/팔로잉, 자기소개 편집
+-  **그룹 검색** - 카테고리별 그룹 검색 (개발 중)
+-  **그룹 생성** - 새로운 그룹 만들기 (개발 중)
+-  **채팅** - 그룹 내 실시간 채팅 (예정)
+-  **친구** - 친구 관리 기능 (예정)
+
+##  시작하기
+
+### 필수 요구사항
+
+- Node.js 18 이상
+- npm 또는 yarn
+- Expo CLI
+- iOS Simulator (Mac) 또는 Android Emulator
+
+### 설치 및 실행
+
+1. **의존성 설치**
+
+   ```bash
+   npm install
+   ```
+
+2. **개발 서버 시작**
+
+   ```bash
+   npx expo start
+   ```
+
+3. **앱 실행**
+   - iOS: `i` 키를 눌러 iOS 시뮬레이터에서 실행
+   - Android: `a` 키를 눌러 Android 에뮬레이터에서 실행
+   - 웹: `w` 키를 눌러 웹 브라우저에서 실행
+
+##  프로젝트 구조
+
+```
+my-app/
+├── app/                          # 화면 및 라우팅
+│   ├── (tabs)/                   # 탭 네비게이션 화면
+│   │   ├── index.tsx            # Explore (메인 화면)
+│   │   ├── chat.tsx             # Chat (채팅)
+│   │   ├── friends.tsx          # Friends (친구)
+│   │   └── profile.tsx          # Profile (프로필)
+│   ├── sign-in.tsx              # 로그인 화면
+│   ├── sign-up.tsx              # 회원가입 화면
+│   └── _layout.tsx              # 루트 레이아웃
+├── components/                   # 재사용 가능한 UI 컴포넌트
+│   └── ui/
+│       ├── Avatar.tsx           # 아바타 컴포넌트
+│       ├── Button.tsx           # 버튼 컴포넌트
+│       ├── Card.tsx             # 카드 컴포넌트
+│       ├── CategoryChip.tsx     # 카테고리 칩
+│       ├── GroupCard.tsx        # 그룹 카드
+│       ├── Input.tsx            # 입력 필드
+│       ├── SearchBar.tsx        # 검색 바
+│       ├── StatCounter.tsx      # 통계 카운터
+│       └── TextLink.tsx         # 텍스트 링크
+├── contexts/                     # React Context
+│   └── AuthContext.tsx          # 인증 상태 관리
+├── hooks/                        # 커스텀 훅
+│   └── useAuth.ts               # 인증 훅
+├── constants/                    # 상수 및 디자인 토큰
+│   └── design-tokens.ts         # 디자인 시스템
+├── config/                       # 설정 파일
+│   └── firebase.ts              # Firebase 설정
+└── assets/                       # 정적 리소스
+```
+
+##  디자인 시스템
+
+프로젝트는 일관된 디자인을 위해 중앙 집중식 디자인 토큰 시스템을 사용합니다.
+
+### 주요 디자인 토큰
+
+- **Colors** - Primary, Success, Warning, Error, Background, Text
+- **Typography** - Font sizes, weights, line heights
+- **Spacing** - 일관된 여백 시스템 (xs, sm, md, lg, xl, 2xl, 3xl)
+- **Border Radius** - 모서리 둥글기 (sm, md, lg, xl, full)
+- **Shadows** - 그림자 효과 (sm, md, lg, xl)
+
+### 다크 모드 지원
+
+모든 화면과 컴포넌트는 라이트/다크 모드를 자동으로 지원합니다.
+
+##  Firebase 설정
+
+이 프로젝트는 Firebase를 사용하여 인증 및 데이터 저장을 처리합니다.
+
+### Firebase 서비스
+
+- **Authentication** - 이메일/비밀번호 인증
+- **Firestore** - 그룹 및 사용자 데이터 저장 (예정)
+- **Storage** - 이미지 업로드 (예정)
+
+### 환경 설정
+
+Firebase 설정은 `config/firebase.ts`에 있습니다. 본인의 Firebase 프로젝트를 사용하려면 해당 파일의 설정을 업데이트하세요.
+
+##  화면 구성
+
+### 1. 인증 화면
+
+- **회원가입** (`/sign-up`) - 이메일/비밀번호로 계정 생성
+- **로그인** (`/sign-in`) - 기존 계정으로 로그인
+
+### 2. 메인 화면 (Explore)
+
+- 이달의 그룹 섹션
+- 인기있는 그룹 섹션
+- 그룹 검색 기능
+- 그룹 생성 버튼
+
+### 3. 프로필 화면
+
+- 사용자 아바타 및 정보
+- 팔로워/팔로잉 통계
+- 자기소개 편집
+- 로그아웃 기능
+
+### 4. 기타 화면
+
+- **Chat** - 채팅 화면 (개발 예정)
+- **Friends** - 친구 목록 (개발 예정)
+
+##  기술 스택
+
+- **Framework**: React Native (Expo)
+- **Language**: TypeScript
+- **Navigation**: Expo Router (file-based routing)
+- **Authentication**: Firebase Auth
+- **Database**: Firebase Firestore (예정)
+- **Storage**: Firebase Storage (예정)
+- **State Management**: React Context API
+- **Styling**: StyleSheet (React Native)
+- **Icons**: Expo Vector Icons (@expo/vector-icons)
+
+##  개발 현황
+
+### 완료된 기능 
+
+- [x] 디자인 시스템 구축 (design tokens)
+- [x] 재사용 가능한 UI 컴포넌트 라이브러리
+- [x] Firebase 인증 시스템 (회원가입, 로그인, 로그아웃)
+- [x] 전역 인증 상태 관리 (AuthContext)
+- [x] 메인 화면 (그룹 목록)
+- [x] 프로필 화면 (사용자 정보, 통계)
+- [x] 하단 탭 네비게이션
+- [x] 다크 모드 지원
+
+### 개발 중 
+
+- [ ] 그룹 검색 화면
+- [ ] 그룹 생성 화면
+- [ ] Firestore 데이터베이스 연동
+- [ ] 실제 그룹 데이터 CRUD
+
+### 예정 기능 
+
+- [ ] 채팅 기능
+- [ ] 친구 관리
+- [ ] 그룹 상세 페이지
+- [ ] 알림 시스템
+- [ ] 이미지 업로드
+- [ ] 프로필 사진 변경
+---
+
+**Last Updated**: 2025-11-20
