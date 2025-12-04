@@ -471,7 +471,14 @@ export default function ChatDetailScreen() {
 
             <View style={styles.settingItem}>
               <Text style={styles.settingText}>참여자 ({participants.length}명)</Text>
-              <TouchableOpacity onPress={() => setInviteModalVisible(true)}>
+              <TouchableOpacity
+                onPress={() => {
+                  setSettingsVisible(false); // 1. 설정창 먼저 닫기
+                  // 2. 안드로이드 모달 애니메이션 처리를 위해 약간의 딜레이 후 초대창 열기
+                  setTimeout(() => {
+                    setInviteModalVisible(true);
+                  }, 500);
+                }}>
                 <Text style={{color: '#006FFD', fontWeight: '600'}}>+ 초대하기</Text>
               </TouchableOpacity>
             </View>
