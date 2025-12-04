@@ -5,6 +5,8 @@ import 'react-native-reanimated';
 
 import {useColorScheme} from '@/hooks/use-color-scheme';
 import {AuthProvider} from '@/contexts/AuthContext';
+// ✅ GroupProvider 추가
+import {GroupProvider} from '@/contexts/GroupContext';
 
 import {useEffect} from 'react';
 import {useSegments, useRouter} from 'expo-router';
@@ -20,21 +22,23 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
 
+  // 기존 인증 보호 로직 유지
   useEffect(() => {
     if (loading) return;
 
     const inAuthGroup =
-      segments[0] === '(auth)' ||
       segments[0] === 'sign-in' ||
       segments[0] === 'sign-up' ||
       segments[0] === 'select-grade';
-    const inTabsGroup = segments[0] === '(tabs)';
+
+    // segments[0] === '(tabs)' 확인 로직은 필요하다면 유지, 아니면 생략 가능
+    // const inTabsGroup = segments[0] === '(tabs)';
 
     if (!user && !inAuthGroup) {
-      // If not logged in and trying to access protected route, redirect to sign-in
+      // 로그인이 안 되어 있는데 보호된 라우트에 접근 시
       router.replace('/sign-in');
     } else if (user && inAuthGroup) {
-      // If logged in and trying to access auth screens, redirect to tabs
+      // 로그인이 되어 있는데 로그인/회원가입 화면 접근 시
       router.replace('/(tabs)');
     }
   }, [user, loading, segments]);
@@ -42,6 +46,7 @@ function RootLayoutNav() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
+        {/* 기존 화면들 */}
         <Stack.Screen name="(tabs)" options={{headerShown: false}} />
         <Stack.Screen name="sign-in" options={{headerShown: false}} />
         <Stack.Screen name="sign-up" options={{headerShown: false}} />
@@ -49,6 +54,11 @@ function RootLayoutNav() {
         <Stack.Screen name="profile-management" options={{headerShown: false}} />
         <Stack.Screen name="delete-account" options={{headerShown: false}} />
         <Stack.Screen name="modal" options={{presentation: 'modal', title: 'Modal'}} />
+
+        {/* ✅ 추가된 그룹 관련 화면들 */}
+        <Stack.Screen name="create-group" options={{headerShown: false}} />
+        <Stack.Screen name="group-list" options={{headerShown: false}} />
+        <Stack.Screen name="group-detail" options={{headerShown: false}} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
@@ -58,7 +68,10 @@ function RootLayoutNav() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootLayoutNav />
+      {/* ✅ AuthProvider 안쪽에 GroupProvider 배치 (User 정보가 필요할 수 있으므로) */}
+      <GroupProvider>
+        <RootLayoutNav />
+      </GroupProvider>
     </AuthProvider>
   );
 }

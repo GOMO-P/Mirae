@@ -5,12 +5,13 @@ import {getStorage} from 'firebase/storage';
 
 // Firebase 설정
 const firebaseConfig = {
-  apiKey: 'AIzaSyDYgfGY9Qqvg630nptcn1WNBqhb1GXLezo',
-  authDomain: 'test-1ccad42a.firebaseapp.com',
-  projectId: 'test-1ccad42a',
-  storageBucket: 'test-1ccad42a.firebasestorage.app',
-  messagingSenderId: '753991690407',
-  appId: '1:753991690407:web:baec9d8d9820401e289382',
+  apiKey: 'AIzaSyCNpAXo9k_5oGoVaf2ebU2kWjQiiTk4K0o',
+  authDomain: 'myapp-bc5d3.firebaseapp.com',
+  projectId: 'myapp-bc5d3',
+  storageBucket: 'myapp-bc5d3.firebasestorage.app',
+  messagingSenderId: '81835239864',
+  appId: '1:81835239864:web:0c31492d967f4d4382474d',
+  measurementId: 'G-80K5K3M4KQ',
 };
 
 // Firebase 초기화
