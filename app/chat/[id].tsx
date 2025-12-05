@@ -111,6 +111,7 @@ export default function ChatDetailScreen() {
 
   // 2. 방 정보 구독
   // 2. 방 정보 구독
+  // 2. 방 정보 구독 (수정됨: 실시간 읽음 처리 로직 추가)
   useEffect(() => {
     if (!roomId || !user) return;
 
@@ -119,7 +120,7 @@ export default function ChatDetailScreen() {
       if (docSnap.exists()) {
         const roomData = docSnap.data();
 
-        // [수정 1] 방장 ID 가져오기 (이전 질문의 fix 유지)
+        // [수정 1] 방장 ID 가져오기
         if (roomData.createdBy) {
           setRoomOwnerId(roomData.createdBy);
         }
@@ -129,19 +130,35 @@ export default function ChatDetailScreen() {
           setCurrentRoomName(roomData.name);
         }
 
-        // 🔥 [핵심 추가] 내가 참여자 목록에서 사라졌는지 확인 (강퇴 감지)
+        // 🔥 [핵심 수정] 실시간 읽음 처리 로직
+        // 내가 현재 이 화면(채팅방)을 보고 있는데 내 안읽음 카운트가 0보다 크다면,
+        // (상대방이 방금 메시지를 보낸 상황) 즉시 0으로 초기화 요청을 보냅니다.
+        const myUnreadCount = roomData.unreadCounts?.[user.uid] || 0;
+
+        if (myUnreadCount > 0) {
+          try {
+            await updateDoc(roomRef, {
+              [`unreadCounts.${user.uid}`]: 0,
+            });
+          } catch (e) {
+            console.error('읽음 처리 실패:', e);
+          }
+        }
+
+        // ---------------------------------------------------------
+        // 아래는 기존 로직 유지 (강퇴 감지, 알림 설정, 참여자 정보 로딩)
+        // ---------------------------------------------------------
+
         const currentParticipants = roomData.participants || [];
 
-        // 방금 데이터를 받아왔는데, 내 ID가 참여자 목록에 없다면? -> 쫓겨난 상황
+        // 강퇴 감지: 내 ID가 참여자 목록에서 사라졌는지 확인
         if (!currentParticipants.includes(user.uid)) {
           setSettingsVisible(false); // 설정 모달 닫기
 
           if (Platform.OS === 'web') {
-            // 🌐 Web: 브라우저 기본 알림
             window.alert('방장에 의해 내보내졌습니다.');
             router.replace('/(tabs)/chat');
           } else {
-            // 📱 iOS/Android: 네이티브 알림
             Alert.alert('알림', '방장에 의해 내보내졌습니다.', [
               {
                 text: '확인',
@@ -152,14 +169,14 @@ export default function ChatDetailScreen() {
               },
             ]);
           }
-          return; // 더 이상 아래 로직(참여자 정보 불러오기 등)을 실행하지 않음
+          return;
         }
 
         // 알림 설정 동기화
         const mutedList = roomData.mutedBy || [];
         setIsNotificationEnabled(!mutedList.includes(user.uid));
 
-        // 참여자 정보 상세 로딩 (기존 로직 유지)
+        // 참여자 정보 상세 로딩
         if (currentParticipants.length > 0) {
           try {
             const usersRef = collection(db, 'users');
@@ -175,7 +192,7 @@ export default function ChatDetailScreen() {
           setParticipants([]);
         }
       } else {
-        // 방이 아예 삭제된 경우
+        // 방이 삭제된 경우
         if (Platform.OS === 'web') {
           window.alert('채팅방이 종료되었습니다.');
           router.replace('/(tabs)/chat');
