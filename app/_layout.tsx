@@ -27,9 +27,7 @@ function RootLayoutNav() {
     if (loading) return;
 
     const inAuthGroup =
-      segments[0] === 'sign-in' ||
-      segments[0] === 'sign-up' ||
-      segments[0] === 'select-grade';
+      segments[0] === 'sign-in' || segments[0] === 'sign-up' || segments[0] === 'select-grade';
 
     // segments[0] === '(tabs)' 확인 로직은 필요하다면 유지, 아니면 생략 가능
     // const inTabsGroup = segments[0] === '(tabs)';
@@ -59,6 +57,12 @@ function RootLayoutNav() {
         <Stack.Screen name="create-group" options={{headerShown: false}} />
         <Stack.Screen name="group-list" options={{headerShown: false}} />
         <Stack.Screen name="group-detail" options={{headerShown: false}} />
+
+        {/* ✅ 설정 관련 화면들 */}
+        <Stack.Screen name="customer-center" options={{headerShown: false}} />
+        <Stack.Screen name="notifications" options={{headerShown: false}} />
+        <Stack.Screen name="privacy" options={{headerShown: false}} />
+        <Stack.Screen name="language" options={{headerShown: false}} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
   StyleSheet,
   Text,
@@ -17,6 +17,15 @@ import {IconSymbol} from '@/components/ui/icon-symbol';
 import {useRouter} from 'expo-router';
 import {useAuthContext} from '@/contexts/AuthContext';
 import * as Notifications from 'expo-notifications';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () =>
+    ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    } as any),
+});
 
 import {db} from '@/config/firebase';
 import {
@@ -62,6 +71,17 @@ export default function ChatScreen() {
   const [loadingUsers, setLoadingUsers] = useState(false);
 
   const [userMap, setUserMap] = useState<{[key: string]: string}>({});
+  const isFirstLoad = useRef(true);
+
+  // 0. 알림 권한 요청
+  useEffect(() => {
+    (async () => {
+      const {status} = await Notifications.requestPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('알림 권한이 거부되었습니다.');
+      }
+    })();
+  }, []);
 
   // 1. 유저 목록 가져오기 (이름 매칭용) - 한 번만 실행
   useEffect(() => {
@@ -111,6 +131,38 @@ export default function ChatScreen() {
           }
         });
 
+        // 알림 로직: 변경사항 감지
+        if (!isFirstLoad.current) {
+          snapshot.docChanges().forEach(change => {
+            if (change.type === 'modified' || change.type === 'added') {
+              const data = change.doc.data();
+              const participants = data.participants || [];
+              const isLocal = snapshot.metadata.hasPendingWrites;
+
+              // 1. 내가 포함된 방이고
+              // 2. 로컬 변경(내가 보낸 것)이 아니며
+              // 3. 나에게 읽지 않은 메시지가 있을 때
+              if (participants.includes(user.uid) && !isLocal) {
+                const myUnread = data.unreadCounts?.[user.uid] || 0;
+                if (myUnread > 0) {
+                  // 보낸 사람 이름 찾기 (상대방)
+                  let senderName = '새 메시지';
+                  const otherId = participants.find((uid: string) => uid !== user.uid);
+                  if (otherId && userMap[otherId]) {
+                    senderName = userMap[otherId];
+                  } else if (data.name) {
+                    senderName = data.name;
+                  }
+
+                  schedulePushNotification(senderName, data.lastMessage || '사진을 보냈습니다.');
+                }
+              }
+            }
+          });
+        }
+
+        isFirstLoad.current = false;
+
         setChatList(rooms);
         setLoading(false);
       },
@@ -121,7 +173,7 @@ export default function ChatScreen() {
     );
 
     return () => unsubscribe();
-  }, [user, authLoading]); // 의존성 확실하게
+  }, [user, authLoading, userMap]); // userMap이 업데이트되면 알림 이름도 정확해짐
 
   // (알림 함수 생략 - 동일)
   async function schedulePushNotification(title: string, body: string) {

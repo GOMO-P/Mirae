@@ -15,6 +15,7 @@ import {useRouter} from 'expo-router';
 import useAuth from '@/hooks/useAuth';
 import {Colors, Typography, Spacing, BorderRadius} from '@/constants/design-tokens';
 import {Ionicons} from '@expo/vector-icons';
+import * as Device from 'expo-device';
 
 export default function SettingsScreen() {
   const colorScheme = useColorScheme();
@@ -24,14 +25,15 @@ export default function SettingsScreen() {
   const router = useRouter();
 
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [deviceModalVisible, setDeviceModalVisible] = useState(false);
 
   const backgroundColor = isDark ? Colors.background.dark : Colors.background.light;
   const textColor = isDark ? Colors.text.primary.dark : Colors.text.primary.light;
   const secondaryTextColor = isDark ? Colors.text.secondary.dark : Colors.text.secondary.light;
   const borderColor = isDark ? '#333333' : '#E5E7EB';
 
-  const userName = user?.displayName || '민덕팔';
-  const userTag = user?.email?.split('@')[0] || 'lucasscott3';
+  const userName = user?.displayName || 'user';
+  const userTag = user?.email?.split('@')[0] || 'user';
 
   const handleLogoutPress = () => {
     setLogoutModalVisible(true);
@@ -47,10 +49,10 @@ export default function SettingsScreen() {
 
   const menuItems = [
     {id: 'edit-profile', label: '프로필 편집', icon: 'chevron-forward'},
-    {id: 'devices', label: '장치', icon: 'chevron-forward'},
+    {id: 'devices', label: '사용 중인 장치', icon: 'chevron-forward'},
     {id: 'notifications', label: '알림 설정', icon: 'chevron-forward'},
     {id: 'language', label: '언어', icon: 'chevron-forward'},
-    {id: 'customer-center', label: '고객센터', icon: 'chevron-forward'},
+    {id: 'customer-center', label: '앱 가이드', icon: 'chevron-forward'},
     {id: 'privacy', label: '개인정보 및 보안', icon: 'chevron-forward'},
     {id: 'delete-account', label: '회원탈퇴', icon: 'chevron-forward'},
   ];
@@ -93,6 +95,16 @@ export default function SettingsScreen() {
                   router.push('/delete-account');
                 } else if (item.id === 'edit-profile') {
                   router.push('/profile-management');
+                } else if (item.id === 'devices') {
+                  setDeviceModalVisible(true);
+                } else if (item.id === 'privacy') {
+                  router.push('/privacy');
+                } else if (item.id === 'language') {
+                  router.push('/language');
+                } else if (item.id === 'notifications') {
+                  router.push('/notifications');
+                } else if (item.id === 'customer-center') {
+                  router.push('/customer-center');
                 }
               }}>
               <Text style={[styles.menuText, {color: textColor}]}>{item.label}</Text>
@@ -133,6 +145,42 @@ export default function SettingsScreen() {
                 <Text style={styles.modalConfirmButtonText}>로그아웃</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Device Info Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={deviceModalVisible}
+        onRequestClose={() => setDeviceModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>내 기기 정보</Text>
+            <View style={{marginBottom: 20, width: '100%'}}>
+              <View
+                style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8}}>
+                <Text style={{color: '#666'}}>모델명</Text>
+                <Text style={{fontWeight: '600'}}>{Device.modelName || 'Unknown'}</Text>
+              </View>
+              <View
+                style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8}}>
+                <Text style={{color: '#666'}}>제조사</Text>
+                <Text style={{fontWeight: '600'}}>{Device.manufacturer || 'Unknown'}</Text>
+              </View>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
+                <Text style={{color: '#666'}}>OS</Text>
+                <Text style={{fontWeight: '600'}}>
+                  {Device.osName} {Device.osVersion}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.modalConfirmButton]}
+              onPress={() => setDeviceModalVisible(false)}>
+              <Text style={styles.modalConfirmButtonText}>확인</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
