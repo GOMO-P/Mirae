@@ -33,8 +33,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="friends"
         options={{
-          title: 'Friends',
-          tabBarIcon: ({color}) => <IconSymbol size={28} name="person.2" color={color} />,
+          title: 'Group',
+          tabBarIcon: ({color}) => <IconSymbol size={28} name="person.3" color={color} />,
         }}
         />
       <Tabs.Screen

@@ -156,19 +156,15 @@ export default function StudyCertScreen() {
         createdAt: serverTimestamp(),
       });
 
-      Alert.alert('완료', '공부 인증이 등록되었어요!', [
-        {
-          text: '확인',
-          onPress: () => router.back(),
-        },
-      ]);
-
       // 폼 초기화
       setDescription('');
       setImageUri(null);
       setHours(1);
       setMinutes(0);
       setSelectedDate(new Date());
+
+      // 피드 화면으로 이동
+      router.push('/study-feed');
     } catch (e) {
       console.error('인증 등록 전체 에러:', e);
       Alert.alert('에러', '저장 중 오류가 발생했어요.');
