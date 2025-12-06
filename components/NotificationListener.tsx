@@ -4,7 +4,7 @@ import {Platform} from 'react-native';
 import {collection, query, where, onSnapshot} from 'firebase/firestore';
 import {db} from '@/config/firebase';
 import {useAuthContext} from '@/contexts/AuthContext';
-import {useSegments} from 'expo-router';
+import {useSegments, useGlobalSearchParams} from 'expo-router';
 
 // 알림 핸들러 설정 (앱이 포그라운드에 있을 때 알림 표시 방법)
 Notifications.setNotificationHandler({
@@ -21,6 +21,7 @@ Notifications.setNotificationHandler({
 export function NotificationListener() {
   const {user} = useAuthContext();
   const segments = useSegments();
+  const params = useGlobalSearchParams();
   const lastMessageTimes = useRef<{[key: string]: any}>({});
 
   // 1. 권한 요청
@@ -50,6 +51,9 @@ export function NotificationListener() {
     const q = query(collection(db, 'chats'), where('participants', 'array-contains', user.uid));
 
     const unsubscribe = onSnapshot(q, snapshot => {
+      // 웹에서는 알림 표시 안 함
+      if (Platform.OS === 'web') return;
+
       snapshot.docChanges().forEach(change => {
         if (change.type === 'modified' || change.type === 'added') {
           const data = change.doc.data();
@@ -83,11 +87,14 @@ export function NotificationListener() {
             // 알림 끈 채팅방 무시
             if (data.mutedBy && data.mutedBy.includes(user.uid)) return;
 
-            // 현재 보고 있는 채팅방이면 무시 (선택 사항)
-            // segments를 확인하여 현재 라우트가 해당 채팅방인지 확인
-            // segments 예: ['(tabs)', 'chat', '[id]'] 또는 ['chat', '[id]']
-            // params를 가져오기 어려우므로 간단히 체크하거나,
-            // unreadCounts를 믿을 수도 있음.
+            // 🔥 [수정] 현재 보고 있는 채팅방이면 무시
+            // segments에 'chat'이 포함되어 있고, params.id가 현재 방 ID와 같으면 무시
+            const isChatScreen = segments.some(s => s === 'chat');
+            const currentRoomId = Array.isArray(params.id) ? params.id[0] : params.id;
+
+            if (isChatScreen && currentRoomId === roomId) {
+              return;
+            }
 
             // unreadCounts가 나에게 0보다 크면 알림
             const myUnread = data.unreadCounts?.[user.uid] || 0;
@@ -108,7 +115,7 @@ export function NotificationListener() {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, segments, params]);
 
   // 3. 알림 클릭 처리 (딥링크 이동)
   useEffect(() => {

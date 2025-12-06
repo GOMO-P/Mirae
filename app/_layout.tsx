@@ -58,6 +58,7 @@ function RootLayoutNav() {
         <Stack.Screen name="create-group" options={{headerShown: false}} />
         <Stack.Screen name="group-list" options={{headerShown: false}} />
         <Stack.Screen name="group-detail" options={{headerShown: false}} />
+        <Stack.Screen name="chat/[id]" options={{headerShown: false}} />
 
         {/* ✅ 설정 관련 화면들 */}
         <Stack.Screen name="customer-center" options={{headerShown: false}} />
