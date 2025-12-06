@@ -10,6 +10,7 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -25,10 +26,13 @@ import {
 import { db, storage } from '../../config/firebase';
 import { ref, deleteObject } from 'firebase/storage';
 
-const BLUE = '#316BFF';
-const CARD = '#151515';
-const GRAY = '#A0A4AF';
+const BLUE = '#4A90E2';
+const LIGHT_BG = '#F5F7FA';
+const LIGHT_CARD = '#FFFFFF';
+const GRAY = '#8E8E93';
+const LIGHT_GRAY = '#E5E5EA';
 const WHITE = '#FFFFFF';
+const TEXT_DARK = '#1C1C1E';
 
 type StudyRecord = {
   id: string;
@@ -75,46 +79,90 @@ export default function StudyFeedScreen() {
 
   // ===== 삭제 처리 (Firestore + Storage) =====
   const confirmDelete = (record: StudyRecord) => {
-    if (deletingId) return;
+    console.log('삭제 버튼 클릭:', record.id);
+    if (deletingId) {
+      console.log('이미 삭제 중:', deletingId);
+      return;
+    }
 
-    Alert.alert(
-      '삭제',
-      '정말 삭제할까요?',
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '삭제',
-          style: 'destructive',
-          onPress: () => handleDelete(record),
-        },
-      ],
-      { cancelable: true },
-    );
+    // 웹 환경에서도 작동하도록 confirm 사용
+    if (Platform.OS === 'web') {
+      if (window.confirm('정말 삭제할까요?')) {
+        console.log('삭제 확인됨 (web)');
+        handleDelete(record);
+      } else {
+        console.log('삭제 취소 (web)');
+      }
+    } else {
+      Alert.alert(
+        '삭제',
+        '정말 삭제할까요?',
+        [
+          { 
+            text: '취소', 
+            style: 'cancel',
+            onPress: () => console.log('삭제 취소')
+          },
+          {
+            text: '삭제',
+            style: 'destructive',
+            onPress: () => {
+              console.log('삭제 확인됨');
+              handleDelete(record);
+            },
+          },
+        ],
+        { cancelable: true },
+      );
+    }
   };
 
   const handleDelete = async (record: StudyRecord) => {
+    console.log('삭제 시작:', record.id);
     try {
       setDeletingId(record.id);
 
-      // 1) 사진이 있으면 Storage에서도 삭제 시도
+      // 1) Firestore 문서 먼저 삭제 (더 중요)
+      console.log('Firestore 문서 삭제 시도:', record.id);
+      await deleteDoc(doc(db, 'studyRecords', record.id));
+      console.log('Firestore 문서 삭제 완료:', record.id);
+
+      // 2) 사진이 있으면 Storage에서도 삭제 시도
       if (record.imageUrl) {
         try {
-          // Firebase v9: 다운로드 URL 그대로 넣어도 ref에서 해석해줌
-          const imgRef = ref(storage, record.imageUrl);
-          await deleteObject(imgRef);
+          console.log('이미지 삭제 시도:', record.imageUrl);
+          // URL에서 파일 경로 추출
+          const url = record.imageUrl;
+          const pathMatch = url.match(/studyCerts%2F[^?]+/);
+          if (pathMatch) {
+            const filePath = decodeURIComponent(pathMatch[0].replace(/%2F/g, '/'));
+            const imgRef = ref(storage, filePath);
+            await deleteObject(imgRef);
+            console.log('이미지 삭제 성공:', filePath);
+          } else {
+            console.log('이미지 경로 추출 실패');
+          }
         } catch (err) {
           console.warn('이미지 삭제 실패(무시 가능):', err);
-          // 사진 삭제는 실패해도 글 삭제는 계속 진행
         }
       }
 
-      // 2) Firestore 문서 삭제
-      await deleteDoc(doc(db, 'studyRecords', record.id));
-    } catch (err) {
+      if (Platform.OS === 'web') {
+        window.alert('삭제되었습니다.');
+      } else {
+        Alert.alert('완료', '삭제되었습니다.');
+      }
+    } catch (err: any) {
       console.error('인증 삭제 에러:', err);
-      Alert.alert('에러', '삭제 중 오류가 발생했어요.');
+      console.error('에러 상세:', err.message);
+      if (Platform.OS === 'web') {
+        window.alert(`삭제 중 오류가 발생했어요.\n${err.message || '알 수 없는 오류'}`);
+      } else {
+        Alert.alert('에러', `삭제 중 오류가 발생했어요.\n${err.message || '알 수 없는 오류'}`);
+      }
     } finally {
       setDeletingId(null);
+      console.log('삭제 프로세스 종료');
     }
   };
 
@@ -209,7 +257,7 @@ export default function StudyFeedScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: LIGHT_BG,
   },
   header: {
     paddingHorizontal: 16,
@@ -222,7 +270,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: WHITE,
+    color: '#000',
   },
   headerBtn: {
     paddingHorizontal: 12,
@@ -240,10 +288,15 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   card: {
-    backgroundColor: CARD,
+    backgroundColor: LIGHT_CARD,
     borderRadius: 18,
     padding: 14,
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -251,7 +304,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   dateText: {
-    color: WHITE,
+    color: TEXT_DARK,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -273,7 +326,7 @@ const styles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 12,
-    backgroundColor: '#202020',
+    backgroundColor: LIGHT_BG,
   },
   photoPlaceholder: {
     alignItems: 'center',
@@ -289,7 +342,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   descText: {
-    color: WHITE,
+    color: TEXT_DARK,
     fontSize: 13,
   },
   cardFooter: {
@@ -320,7 +373,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   emptyText: {
-    color: WHITE,
+    color: '#000',
     fontSize: 15,
     marginBottom: 4,
   },

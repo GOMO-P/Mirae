@@ -31,9 +31,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="Group"
+        name="group"
         options={{
-          title: 'Friends',
+          title: 'Group',
           tabBarIcon: ({color}) => <IconSymbol size={28} name="person.3" color={color} />,
         }}
       />
