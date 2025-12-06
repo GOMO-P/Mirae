@@ -8,13 +8,12 @@ GOMO는 사용자들이 다양한 주제의 그룹을 만들고, 검색하고, �
 
 ### 주요 기능
 
-- 👌🏻 **사용자 인증** - Firebase를 이용한 회원가입/로그인/로그아웃
+- 👍🏻�**사용자 인증** - Firebase를 이용한 회원가입/로그인/로그아웃
 - 👍🏻 **그룹 탐색** - 이달의 그룹, 인기있는 그룹 목록 조회
-- ✌🏻 **프로필 관리** - 사용자 프로필, 팔로워/팔로잉, 자기소개 편집
+- 👍🏻 **프로필 관리** - 사용자 프로필, 팔로워/팔로잉, 자기소개 편집
 -  **그룹 검색** - 카테고리별 그룹 검색 (개발 중)
--  **그룹 생성** - 새로운 그룹 만들기 (개발 중)
--  **채팅** - 그룹 내 실시간 채팅 (예정)
--  **친구** - 친구 관리 기능 (예정)
+- 👍🏻 **그룹 생성** - 새로운 그룹 만들기
+- 👍🏻 **채팅** - 그룹 내 실시간 채팅
 
 ##  시작하기
 
@@ -102,8 +101,8 @@ my-app/
 ### Firebase 서비스
 
 - **Authentication** - 이메일/비밀번호 인증
-- **Firestore** - 그룹 및 사용자 데이터 저장 (예정)
-- **Storage** - 이미지 업로드 (예정)
+- **Firestore** - 그룹 및 사용자 데이터 저장
+- **Storage** - 이미지 업로드
 
 ### 환경 설정
 
@@ -132,8 +131,8 @@ Firebase 설정은 `config/firebase.ts`에 있습니다. 본인의 Firebase 프�
 
 ### 4. 기타 화면
 
-- **Chat** - 채팅 화면 (개발 예정)
-- **Friends** - 친구 목록 (개발 예정)
+- **Chat** - 채팅 화면
+- **Friends** - 친구 목록
 
 ##  기술 스택
 
@@ -141,8 +140,8 @@ Firebase 설정은 `config/firebase.ts`에 있습니다. 본인의 Firebase 프�
 - **Language**: TypeScript
 - **Navigation**: Expo Router (file-based routing)
 - **Authentication**: Firebase Auth
-- **Database**: Firebase Firestore (예정)
-- **Storage**: Firebase Storage (예정)
+- **Database**: Firebase Firestore
+- **Storage**: Firebase Storage 
 - **State Management**: React Context API
 - **Styling**: StyleSheet (React Native)
 - **Icons**: Expo Vector Icons (@expo/vector-icons)
@@ -158,23 +157,21 @@ Firebase 설정은 `config/firebase.ts`에 있습니다. 본인의 Firebase 프�
 - [x] 메인 화면 (그룹 목록)
 - [x] 프로필 화면 (사용자 정보, 통계)
 - [x] 하단 탭 네비게이션
-- [x] 다크 모드 지원
+- [x] 그룹 생성 화면
+- [x] Firestore 데이터베이스 연동
 
 ### 개발 중 
 
 - [ ] 그룹 검색 화면
-- [ ] 그룹 생성 화면
-- [ ] Firestore 데이터베이스 연동
 - [ ] 실제 그룹 데이터 CRUD
+- [ ] 그룹 참여화면에 유저 목록 나오도록
+- [ ] 그룹 참여 시 그룹 탭에 참여한 그룹 목록나오도록
+- [ ] 팔로우 팔로워 기능
+- [ ] 스터디 지원서 어디선가 보이도록
+- [ ] 그룹 탈퇴
+- [ ] 통계기능 -> 완료
 
-### 예정 기능 
 
-- [ ] 채팅 기능
-- [ ] 친구 관리
-- [ ] 그룹 상세 페이지
-- [ ] 알림 시스템
-- [ ] 이미지 업로드
-- [ ] 프로필 사진 변경
 ---
 
-**Last Updated**: 2025-11-20
+**Last Updated**: 2025-12-06
