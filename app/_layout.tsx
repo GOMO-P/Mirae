@@ -7,6 +7,7 @@ import {useColorScheme} from '@/hooks/use-color-scheme';
 import {AuthProvider} from '@/contexts/AuthContext';
 // ✅ GroupProvider 추가
 import {GroupProvider} from '@/contexts/GroupContext';
+import {NotificationListener} from '@/components/NotificationListener';
 
 import {useEffect} from 'react';
 import {useSegments, useRouter} from 'expo-router';
@@ -27,9 +28,7 @@ function RootLayoutNav() {
     if (loading) return;
 
     const inAuthGroup =
-      segments[0] === 'sign-in' ||
-      segments[0] === 'sign-up' ||
-      segments[0] === 'select-grade';
+      segments[0] === 'sign-in' || segments[0] === 'sign-up' || segments[0] === 'select-grade';
 
     // segments[0] === '(tabs)' 확인 로직은 필요하다면 유지, 아니면 생략 가능
     // const inTabsGroup = segments[0] === '(tabs)';
@@ -59,6 +58,13 @@ function RootLayoutNav() {
         <Stack.Screen name="create-group" options={{headerShown: false}} />
         <Stack.Screen name="group-list" options={{headerShown: false}} />
         <Stack.Screen name="group-detail" options={{headerShown: false}} />
+        <Stack.Screen name="chat/[id]" options={{headerShown: false}} />
+
+        {/* ✅ 설정 관련 화면들 */}
+        <Stack.Screen name="customer-center" options={{headerShown: false}} />
+        <Stack.Screen name="notifications" options={{headerShown: false}} />
+        <Stack.Screen name="privacy" options={{headerShown: false}} />
+        <Stack.Screen name="language" options={{headerShown: false}} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
@@ -70,6 +76,7 @@ export default function RootLayout() {
     <AuthProvider>
       {/* ✅ AuthProvider 안쪽에 GroupProvider 배치 (User 정보가 필요할 수 있으므로) */}
       <GroupProvider>
+        <NotificationListener />
         <RootLayoutNav />
       </GroupProvider>
     </AuthProvider>

@@ -1,6 +1,6 @@
 // app/study-cert.tsx
 
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -11,13 +11,13 @@ import {
   ScrollView,
   Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { db, storage } from '../../config/firebase';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {router} from 'expo-router';
+import {addDoc, collection, serverTimestamp} from 'firebase/firestore';
+import {db, storage} from '../../config/firebase';
 
 import * as ImagePicker from 'expo-image-picker';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import {ref, uploadBytes, getDownloadURL} from 'firebase/storage';
 
 const BLUE = '#316BFF';
 const CARD = '#151515';
@@ -59,8 +59,7 @@ export default function StudyCertScreen() {
 
   // ===== 사진 선택 =====
   const pickImage = async () => {
-    const { status } =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const {status} = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (status !== 'granted') {
       Alert.alert('권한 필요', '앨범 접근 권한을 허용해주세요.');
@@ -124,10 +123,7 @@ export default function StudyCertScreen() {
           const response = await fetch(imageUri);
           const blob = await response.blob();
 
-          const fileRef = ref(
-            storage,
-            `studyCerts/defaultUser/${Date.now()}.jpg`,
-          );
+          const fileRef = ref(storage, `studyCerts/defaultUser/${Date.now()}.jpg`);
 
           await uploadBytes(fileRef, blob);
           imageUrl = await getDownloadURL(fileRef);
@@ -135,10 +131,7 @@ export default function StudyCertScreen() {
           console.log('이미지 업로드 완료', imageUrl);
         } catch (err) {
           console.error('이미지 업로드 에러:', err);
-          Alert.alert(
-            '사진 업로드 실패',
-            '사진은 업로드하지 못했지만,\n인증 내용만 저장할게요.',
-          );
+          Alert.alert('사진 업로드 실패', '사진은 업로드하지 못했지만,\n인증 내용만 저장할게요.');
           // imageUrl은 null 그대로 유지 → 텍스트만 저장
         }
       }
@@ -156,19 +149,15 @@ export default function StudyCertScreen() {
         createdAt: serverTimestamp(),
       });
 
-      Alert.alert('완료', '공부 인증이 등록되었어요!', [
-        {
-          text: '확인',
-          onPress: () => router.back(),
-        },
-      ]);
-
       // 폼 초기화
       setDescription('');
       setImageUri(null);
       setHours(1);
       setMinutes(0);
       setSelectedDate(new Date());
+
+      // 피드 화면으로 이동
+      router.push('/study-feed');
     } catch (e) {
       console.error('인증 등록 전체 에러:', e);
       Alert.alert('에러', '저장 중 오류가 발생했어요.');
@@ -196,17 +185,13 @@ export default function StudyCertScreen() {
               <TouchableOpacity
                 style={[
                   styles.toggle,
-                  studyMode === 'solo'
-                    ? styles.toggleActive
-                    : styles.toggleInactive,
+                  studyMode === 'solo' ? styles.toggleActive : styles.toggleInactive,
                 ]}
                 onPress={() => setStudyMode('solo')}>
                 <Text
                   style={[
                     styles.toggleText,
-                    studyMode === 'solo'
-                      ? styles.toggleTextActive
-                      : styles.toggleTextInactive,
+                    studyMode === 'solo' ? styles.toggleTextActive : styles.toggleTextInactive,
                   ]}>
                   혼자 공부
                 </Text>
@@ -215,17 +200,13 @@ export default function StudyCertScreen() {
               <TouchableOpacity
                 style={[
                   styles.toggle,
-                  studyMode === 'group'
-                    ? styles.toggleActive
-                    : styles.toggleInactive,
+                  studyMode === 'group' ? styles.toggleActive : styles.toggleInactive,
                 ]}
                 onPress={() => setStudyMode('group')}>
                 <Text
                   style={[
                     styles.toggleText,
-                    studyMode === 'group'
-                      ? styles.toggleTextActive
-                      : styles.toggleTextInactive,
+                    studyMode === 'group' ? styles.toggleTextActive : styles.toggleTextInactive,
                   ]}>
                   다같이 공부
                 </Text>
@@ -242,17 +223,11 @@ export default function StudyCertScreen() {
               <View style={styles.dateBlock}>
                 <Text style={styles.dateBlockLabel}>MONTH</Text>
                 <View style={styles.dateControlRow}>
-                  <TouchableOpacity
-                    style={styles.dateBtn}
-                    onPress={() => changeMonth(-1)}>
+                  <TouchableOpacity style={styles.dateBtn} onPress={() => changeMonth(-1)}>
                     <Text style={styles.dateBtnText}>-</Text>
                   </TouchableOpacity>
-                  <Text style={styles.dateValue}>
-                    {String(month).padStart(2, '0')}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.dateBtn}
-                    onPress={() => changeMonth(1)}>
+                  <Text style={styles.dateValue}>{String(month).padStart(2, '0')}</Text>
+                  <TouchableOpacity style={styles.dateBtn} onPress={() => changeMonth(1)}>
                     <Text style={styles.dateBtnText}>+</Text>
                   </TouchableOpacity>
                 </View>
@@ -262,17 +237,11 @@ export default function StudyCertScreen() {
               <View style={styles.dateBlock}>
                 <Text style={styles.dateBlockLabel}>DAY</Text>
                 <View style={styles.dateControlRow}>
-                  <TouchableOpacity
-                    style={styles.dateBtn}
-                    onPress={() => changeDay(-1)}>
+                  <TouchableOpacity style={styles.dateBtn} onPress={() => changeDay(-1)}>
                     <Text style={styles.dateBtnText}>-</Text>
                   </TouchableOpacity>
-                  <Text style={styles.dateValue}>
-                    {String(day).padStart(2, '0')}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.dateBtn}
-                    onPress={() => changeDay(1)}>
+                  <Text style={styles.dateValue}>{String(day).padStart(2, '0')}</Text>
+                  <TouchableOpacity style={styles.dateBtn} onPress={() => changeDay(1)}>
                     <Text style={styles.dateBtnText}>+</Text>
                   </TouchableOpacity>
                 </View>
@@ -281,9 +250,7 @@ export default function StudyCertScreen() {
               {/* 요일 표시 */}
               <View style={styles.dateBlockSmall}>
                 <Text style={styles.dateBlockLabel}>WEEKDAY</Text>
-                <Text style={[styles.dateValue, { marginTop: 8 }]}>
-                  {weekday}
-                </Text>
+                <Text style={[styles.dateValue, {marginTop: 8}]}>{weekday}</Text>
               </View>
             </View>
 
@@ -294,27 +261,17 @@ export default function StudyCertScreen() {
 
           {/* 3. 사진 + 시간 */}
           <View style={styles.section}>
-            <Text style={styles.subLabel}>
-              공부한 사진과 시간을 알려주세요!
-            </Text>
+            <Text style={styles.subLabel}>공부한 사진과 시간을 알려주세요!</Text>
 
             <View style={styles.timeRow}>
               {/* 사진 박스 */}
-              <TouchableOpacity
-                style={styles.photoBox}
-                onPress={pickImage}
-                activeOpacity={0.8}>
+              <TouchableOpacity style={styles.photoBox} onPress={pickImage} activeOpacity={0.8}>
                 {imageUri ? (
-                  <Image
-                    source={{ uri: imageUri }}
-                    style={styles.photoImage}
-                  />
+                  <Image source={{uri: imageUri}} style={styles.photoImage} />
                 ) : (
                   <>
                     <Text style={styles.photoIcon}>🖼</Text>
-                    <Text style={styles.photoText}>
-                      사진 선택하기{'\n'}(한 번 터치해서 선택)
-                    </Text>
+                    <Text style={styles.photoText}>사진 선택하기{'\n'}(한 번 터치해서 선택)</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -324,17 +281,11 @@ export default function StudyCertScreen() {
                 <View style={styles.timeBadge}>
                   <Text style={styles.timeTitle}>HOURS</Text>
                   <View style={styles.timeControlRow}>
-                    <TouchableOpacity
-                      style={styles.timeButton}
-                      onPress={() => changeHours(-1)}>
+                    <TouchableOpacity style={styles.timeButton} onPress={() => changeHours(-1)}>
                       <Text style={styles.timeButtonText}>-</Text>
                     </TouchableOpacity>
-                    <Text style={styles.timeValue}>
-                      {String(hours).padStart(2, '0')}
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.timeButton}
-                      onPress={() => changeHours(1)}>
+                    <Text style={styles.timeValue}>{String(hours).padStart(2, '0')}</Text>
+                    <TouchableOpacity style={styles.timeButton} onPress={() => changeHours(1)}>
                       <Text style={styles.timeButtonText}>+</Text>
                     </TouchableOpacity>
                   </View>
@@ -343,17 +294,11 @@ export default function StudyCertScreen() {
                 <View style={styles.timeBadge}>
                   <Text style={styles.timeTitle}>MINUTES</Text>
                   <View style={styles.timeControlRow}>
-                    <TouchableOpacity
-                      style={styles.timeButton}
-                      onPress={() => changeMinutes(-5)}>
+                    <TouchableOpacity style={styles.timeButton} onPress={() => changeMinutes(-5)}>
                       <Text style={styles.timeButtonText}>-</Text>
                     </TouchableOpacity>
-                    <Text style={styles.timeValue}>
-                      {String(minutes).padStart(2, '0')}
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.timeButton}
-                      onPress={() => changeMinutes(5)}>
+                    <Text style={styles.timeValue}>{String(minutes).padStart(2, '0')}</Text>
+                    <TouchableOpacity style={styles.timeButton} onPress={() => changeMinutes(5)}>
                       <Text style={styles.timeButtonText}>+</Text>
                     </TouchableOpacity>
                   </View>
@@ -364,9 +309,7 @@ export default function StudyCertScreen() {
 
           {/* 4. 설명 입력 */}
           <View style={styles.section}>
-            <Text style={styles.subLabel}>
-              오늘 공부한 내용에 대해 설명해주세요...
-            </Text>
+            <Text style={styles.subLabel}>오늘 공부한 내용에 대해 설명해주세요...</Text>
             <TextInput
               style={styles.textArea}
               multiline
@@ -379,15 +322,10 @@ export default function StudyCertScreen() {
 
           {/* 5. 인증 등록 버튼 */}
           <TouchableOpacity
-            style={[
-              styles.submitButton,
-              submitting && { opacity: 0.6 },
-            ]}
+            style={[styles.submitButton, submitting && {opacity: 0.6}]}
             onPress={handleSubmit}
             disabled={submitting}>
-            <Text style={styles.submitText}>
-              {submitting ? '등록 중...' : '인증 등록하기'}
-            </Text>
+            <Text style={styles.submitText}>{submitting ? '등록 중...' : '인증 등록하기'}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

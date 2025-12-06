@@ -39,6 +39,7 @@ import {
   arrayUnion,
   arrayRemove,
   increment,
+  deleteField, // 🔥 [추가] 필드 삭제용
 } from 'firebase/firestore';
 
 interface Message {
@@ -81,6 +82,9 @@ export default function ChatDetailScreen() {
 
   const flatListRef = useRef<FlatList>(null);
 
+  // 🔥 [추가] 현재 방의 방장 ID를 저장할 state
+  const [roomOwnerId, setRoomOwnerId] = useState<string | null>(null);
+
   // 1. 메시지 데이터 구독
   useEffect(() => {
     if (!roomId) return;
@@ -106,6 +110,8 @@ export default function ChatDetailScreen() {
   }, [roomId]);
 
   // 2. 방 정보 구독
+  // 2. 방 정보 구독
+  // 2. 방 정보 구독 (수정됨: 실시간 읽음 처리 로직 추가)
   useEffect(() => {
     if (!roomId || !user) return;
 
@@ -114,32 +120,86 @@ export default function ChatDetailScreen() {
       if (docSnap.exists()) {
         const roomData = docSnap.data();
 
-        // 🔥 [추가] DB에 저장된 최신 방 이름으로 업데이트
-        if (roomData.name) {
-          setCurrentRoomName(roomData.name);
-          setEditableName(roomData.name);
+        // [수정 1] 방장 ID 가져오기
+        if (roomData.createdBy) {
+          setRoomOwnerId(roomData.createdBy);
         }
 
+        // [수정 2] 방 이름 동기화
+        if (roomData.name) {
+          setCurrentRoomName(roomData.name);
+        }
+
+        // 🔥 [핵심 수정] 실시간 읽음 처리 로직
+        // 내가 현재 이 화면(채팅방)을 보고 있는데 내 안읽음 카운트가 0보다 크다면,
+        // (상대방이 방금 메시지를 보낸 상황) 즉시 0으로 초기화 요청을 보냅니다.
+        const myUnreadCount = roomData.unreadCounts?.[user.uid] || 0;
+
+        if (myUnreadCount > 0) {
+          try {
+            await updateDoc(roomRef, {
+              [`unreadCounts.${user.uid}`]: 0,
+            });
+          } catch (e) {
+            console.error('읽음 처리 실패:', e);
+          }
+        }
+
+        // ---------------------------------------------------------
+        // 아래는 기존 로직 유지 (강퇴 감지, 알림 설정, 참여자 정보 로딩)
+        // ---------------------------------------------------------
+
+        const currentParticipants = roomData.participants || [];
+
+        // 강퇴 감지: 내 ID가 참여자 목록에서 사라졌는지 확인
+        if (!currentParticipants.includes(user.uid)) {
+          setSettingsVisible(false); // 설정 모달 닫기
+
+          if (Platform.OS === 'web') {
+            window.alert('방장에 의해 내보내졌습니다.');
+            router.replace('/(tabs)/chat');
+          } else {
+            Alert.alert('알림', '방장에 의해 내보내졌습니다.', [
+              {
+                text: '확인',
+                onPress: () => {
+                  if (router.canGoBack()) router.back();
+                  else router.replace('/(tabs)/chat');
+                },
+              },
+            ]);
+          }
+          return;
+        }
+
+        // 알림 설정 동기화
         const mutedList = roomData.mutedBy || [];
         setIsNotificationEnabled(!mutedList.includes(user.uid));
 
-        const participantIds = roomData.participants || [];
-        if (participantIds.length > 0) {
+        // 참여자 정보 상세 로딩
+        if (currentParticipants.length > 0) {
           try {
             const usersRef = collection(db, 'users');
-            const q = query(usersRef, where('uid', 'in', participantIds));
+            const q = query(usersRef, where('uid', 'in', currentParticipants));
             const querySnapshot = await getDocs(q);
-
             const users: UserInfo[] = [];
-            querySnapshot.forEach(doc => {
-              users.push(doc.data() as UserInfo);
-            });
+            querySnapshot.forEach(doc => users.push(doc.data() as UserInfo));
             setParticipants(users);
           } catch (error) {
             console.error('참여자 정보 불러오기 실패:', error);
           }
         } else {
           setParticipants([]);
+        }
+      } else {
+        // 방이 삭제된 경우
+        if (Platform.OS === 'web') {
+          window.alert('채팅방이 종료되었습니다.');
+          router.replace('/(tabs)/chat');
+        } else {
+          Alert.alert('알림', '채팅방이 종료되었습니다.', [
+            {text: '확인', onPress: () => router.back()},
+          ]);
         }
       }
     });
@@ -218,6 +278,12 @@ export default function ChatDetailScreen() {
   };
 
   const handleUpdateRoomName = async () => {
+    // 🔥 [추가] 방장이 아니면 권한 없음 알림
+    if (roomOwnerId && user?.uid !== roomOwnerId) {
+      Alert.alert('권한 없음', '채팅방 이름은 방장만 변경할 수 있습니다.');
+      return;
+    }
+
     if (!roomId || !editableName.trim()) {
       notify('알림', '방 이름을 입력해주세요.');
       return;
@@ -281,26 +347,36 @@ export default function ChatDetailScreen() {
     }
   };
 
-  // 8. 나가기 로직
+  // 8. 나가기 로직 수정
   const performLeaveChat = async () => {
     if (!roomId || !user) return;
     try {
       const roomRef = doc(db, 'chats', roomId);
       const roomSnap = await getDoc(roomRef);
+
       if (!roomSnap.exists()) {
         setSettingsVisible(false);
         router.back();
         return;
       }
+
       const roomData = roomSnap.data();
       const currentParticipants = roomData.participants || [];
+      // 내가 나간 후 남게 될 인원들
       const updatedParticipants = currentParticipants.filter((uid: string) => uid !== user.uid);
 
-      if (updatedParticipants.length < 1) {
+      // 🔥 [수정] 남은 인원이 2명 미만(1명 또는 0명)이면 방 삭제
+      // 기존 코드: if (updatedParticipants.length < 1)
+      if (updatedParticipants.length < 2) {
         await deleteDoc(roomRef);
       } else {
-        await updateDoc(roomRef, {participants: updatedParticipants});
+        // 2명 이상 남아있다면, 나만 명단에서 빠짐
+        await updateDoc(roomRef, {
+          participants: updatedParticipants,
+          [`unreadCounts.${user.uid}`]: deleteField(), // 내 읽음 카운트도 삭제
+        });
       }
+
       setSettingsVisible(false);
       router.replace('/(tabs)/chat');
     } catch (e) {
@@ -319,6 +395,73 @@ export default function ChatDetailScreen() {
         {text: '취소', style: 'cancel'},
         {text: '나가기', style: 'destructive', onPress: performLeaveChat},
       ]);
+    }
+  };
+
+  // 🔥 [수정] 유저 강퇴(내보내기) 함수 - Platform 분기 적용
+  // 🔥 [수정] 유저 강퇴 함수 (2명 미만 시 방 폭파 로직 추가)
+  const handleKickUser = async (targetUser: UserInfo) => {
+    if (!roomId) return;
+
+    const executeKick = async () => {
+      try {
+        const roomRef = doc(db, 'chats', roomId);
+
+        // 현재 참여자 수에서 1명(강퇴 대상)을 뺐을 때 남은 인원 계산
+        // participants state는 현재 화면에 보이는 목록 기준입니다.
+        const remainingCount = participants.length - 1;
+
+        // 🔥 [핵심 로직] 남은 인원이 2명 미만(즉, 1명 이하)이면 방 자체를 삭제
+        if (remainingCount < 2) {
+          await deleteDoc(roomRef);
+
+          // 방이 삭제되면 useEffect의 onSnapshot에서 "방이 종료되었습니다" 알림을 띄우고
+          // 목록 화면으로 자동 이동시키므로 별도의 이동 로직은 필요 없습니다.
+        } else {
+          // 남은 인원이 2명 이상이면, 단순히 참여자 목록에서만 제거
+          await updateDoc(roomRef, {
+            participants: arrayRemove(targetUser.uid),
+            [`unreadCounts.${targetUser.uid}`]: deleteField(),
+          });
+
+          // 강퇴 알림 메시지 전송
+          await addDoc(collection(db, 'chats', roomId, 'messages'), {
+            text: `${targetUser.name}님이 방장에 의해 내보내졌습니다.`,
+            sender: 'system',
+            createdAt: serverTimestamp(),
+          });
+
+          // UI 목록 업데이트
+          setParticipants(prev => prev.filter(p => p.uid !== targetUser.uid));
+
+          if (Platform.OS === 'web') {
+            window.alert('성공적으로 내보냈습니다.');
+          } else {
+            Alert.alert('알림', '성공적으로 내보냈습니다.');
+          }
+        }
+      } catch (error) {
+        console.error('강퇴 실패:', error);
+        Alert.alert('오류', '작업을 처리하는 중 문제가 발생했습니다.');
+      }
+    };
+
+    // (확인 창 로직은 기존과 동일)
+    if (Platform.OS === 'web') {
+      if (
+        window.confirm(`${targetUser.name}님을 내보내면 방이 폭파될 수 있습니다. 진행하시겠습니까?`)
+      ) {
+        await executeKick();
+      }
+    } else {
+      Alert.alert(
+        '참여자 내보내기',
+        `${targetUser.name}님을 내보내시겠습니까?\n(남은 인원이 2명 미만이면 방이 삭제됩니다)`,
+        [
+          {text: '취소', style: 'cancel'},
+          {text: '내보내기', style: 'destructive', onPress: executeKick},
+        ],
+      );
     }
   };
 
@@ -442,20 +585,34 @@ export default function ChatDetailScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* 🔥 [추가됨] 채팅방 이름 변경 섹션 */}
+            {/* 채팅방 이름 변경 섹션 (방장만 가능) */}
             <View style={styles.settingItemColumn}>
               <Text style={[styles.settingText, {marginBottom: 8}]}>채팅방 이름</Text>
               <View style={{flexDirection: 'row', gap: 8}}>
                 <TextInput
-                  style={styles.nameInput}
+                  style={[
+                    styles.nameInput,
+                    // 방장이 아니면 회색 배경 & 텍스트 흐리게 처리
+                    user?.uid !== roomOwnerId && {backgroundColor: '#F0F0F0', color: '#999'},
+                  ]}
                   value={editableName}
                   onChangeText={setEditableName}
                   placeholder="방 이름을 입력하세요"
+                  editable={user?.uid === roomOwnerId} // 방장만 수정 가능
                 />
-                <TouchableOpacity style={styles.saveButton} onPress={handleUpdateRoomName}>
-                  <Text style={styles.saveButtonText}>저장</Text>
-                </TouchableOpacity>
+                {/* 방장일 때만 저장 버튼 표시 */}
+                {user?.uid === roomOwnerId && (
+                  <TouchableOpacity style={styles.saveButton} onPress={handleUpdateRoomName}>
+                    <Text style={styles.saveButtonText}>저장</Text>
+                  </TouchableOpacity>
+                )}
               </View>
+              {/* 방장이 아닐 때 안내 문구 */}
+              {user?.uid !== roomOwnerId && (
+                <Text style={{fontSize: 12, color: '#FF5555', marginTop: 4}}>
+                  * 방장만 변경 가능합니다.
+                </Text>
+              )}
             </View>
             <View style={styles.divider} />
 
@@ -473,8 +630,7 @@ export default function ChatDetailScreen() {
               <Text style={styles.settingText}>참여자 ({participants.length}명)</Text>
               <TouchableOpacity
                 onPress={() => {
-                  setSettingsVisible(false); // 1. 설정창 먼저 닫기
-                  // 2. 안드로이드 모달 애니메이션 처리를 위해 약간의 딜레이 후 초대창 열기
+                  setSettingsVisible(false);
                   setTimeout(() => {
                     setInviteModalVisible(true);
                   }, 500);
@@ -489,12 +645,22 @@ export default function ChatDetailScreen() {
                 participants.map(p => (
                   <View key={p.uid} style={styles.participantItem}>
                     <View style={styles.avatarSmall} />
-                    <View>
+                    <View style={{flex: 1}}>
                       <Text style={styles.participantName}>
-                        {p.name || '이름 없음'} {p.uid === user?.uid ? '(나)' : ''}
+                        {p.name || '이름 없음'}
+                        {p.uid === user?.uid ? ' (나)' : ''}
+                        {/* 방장 표시 (왕관 아이콘 등) */}
+                        {p.uid === roomOwnerId ? ' 👑' : ''}
                       </Text>
                       <Text style={styles.participantEmail}>{p.email}</Text>
                     </View>
+
+                    {/* 강퇴 버튼: 나는 방장이고, 상대방은 내가 아닐 때 표시 */}
+                    {user?.uid === roomOwnerId && p.uid !== user.uid && (
+                      <TouchableOpacity style={styles.kickButton} onPress={() => handleKickUser(p)}>
+                        <Text style={styles.kickButtonText}>내보내기</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 ))
               ) : (
@@ -688,5 +854,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 0.5,
     borderBottomColor: '#F0F0F0',
+  },
+  // 🔥 [추가] 내보내기 버튼 스타일
+  kickButton: {
+    backgroundColor: '#FFEBEE',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  kickButtonText: {
+    color: '#D32F2F',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

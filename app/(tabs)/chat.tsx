@@ -42,6 +42,7 @@ interface ChatRoom {
   avatarBgColor: string;
   unreadCounts?: {[key: string]: number};
   participants?: string[];
+  createdBy?: string;
 }
 
 interface UserData {
@@ -78,51 +79,33 @@ export default function ChatScreen() {
 
   // 2. 채팅방 목록 가져오기
   useEffect(() => {
+    if (!user) return;
     // 유저 정보가 없거나 로딩 중이면 구독하지 않음
-    if (authLoading || !user) {
-      setLoading(false); // 무한 로딩 방지
-      return;
-    }
-
-    setLoading(true); // 구독 시작 시 로딩
-
-    const q = query(collection(db, 'chats'), orderBy('lastMessageAt', 'desc'));
-
+    const chatsRef = collection(db, 'chats');
+    const q = query(
+      chatsRef,
+      where('participants', 'array-contains', user.uid),
+      orderBy('lastMessageAt', 'desc'),
+    );
     const unsubscribe = onSnapshot(
       q,
       snapshot => {
-        const rooms: ChatRoom[] = [];
-
-        snapshot.docs.forEach(doc => {
-          const data = doc.data();
-          const participants = data.participants || [];
-
-          // 내가 포함된 방만 필터링 (JS단 처리)
-          if (participants.includes(user.uid)) {
-            rooms.push({
-              id: doc.id,
-              name: data.name || '알 수 없는 방',
-              lastMessage: data.lastMessage || '대화가 없습니다.',
-              lastMessageAt: data.lastMessageAt,
-              avatarBgColor: '#EAF2FF',
-              unreadCounts: data.unreadCounts || {},
-              participants: participants,
-            });
-          }
-        });
-
-        setChatList(rooms);
-        setLoading(false);
+        const rooms = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setChatList(rooms as ChatRoom[]);
+        setLoading(false); // 로딩 종료
       },
+      // 2. 실패 시 실행되는 콜백 (이게 없어서 무한 로딩 중일 수 있음)
       error => {
-        console.error('채팅 목록 구독 에러:', error);
-        setLoading(false); // 에러 나도 로딩 끄기
+        console.error('채팅 목록 불러오기 실패:', error);
+        setLoading(false); // 에러가 나도 로딩은 꺼야 함
       },
     );
 
     return () => unsubscribe();
-  }, [user, authLoading]); // 의존성 확실하게
-
+  }, [user]);
   // (알림 함수 생략 - 동일)
   async function schedulePushNotification(title: string, body: string) {
     await Notifications.scheduleNotificationAsync({
@@ -188,8 +171,16 @@ export default function ChatScreen() {
   const renderChatItem = ({item}: {item: ChatRoom}) => {
     const myUnreadCount = item.unreadCounts?.[user?.uid || ''] || 0;
 
+    // 1. DB에 저장된 채팅방 이름(item.name)이 있으면 그걸 최우선으로 씁니다.
     let displayName = item.name;
-    if (item.participants && item.participants.length > 0) {
+
+    // 2. 만약 채팅방 이름이 비어있다면, 상대방 이름을 찾아서 씁니다.
+    const hasCustomName = item.name && item.name.trim().length > 0;
+
+    // (참고: 로직에 따라 '이름이 유저 이름과 같으면' 상대방 이름으로 보여주는 로직이 필요할 수도 있습니다.
+    // 일단 현재는 DB에 name이 있으면 무조건 그걸 보여줍니다.)
+
+    if (!hasCustomName && item.participants) {
       const otherId = item.participants.find(uid => uid !== user?.uid);
       if (otherId && userMap[otherId]) {
         displayName = userMap[otherId];
@@ -200,7 +191,11 @@ export default function ChatScreen() {
       <TouchableOpacity
         style={styles.chatItem}
         onPress={() =>
-          router.push({pathname: '/chat/[id]', params: {id: item.id, name: displayName}})
+          //[수정됨] 상세 화면으로 갈 때 결정된 displayName을 같이 보냅니다.
+          router.push({
+            pathname: '/chat/[id]',
+            params: {id: item.id, name: displayName},
+          })
         }>
         <View style={styles.avatarContainer}>
           <View style={[styles.avatarHead, {backgroundColor: item.avatarBgColor}]} />
