@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   StyleSheet,
   Text,
@@ -17,15 +17,6 @@ import {IconSymbol} from '@/components/ui/icon-symbol';
 import {useRouter} from 'expo-router';
 import {useAuthContext} from '@/contexts/AuthContext';
 import * as Notifications from 'expo-notifications';
-
-Notifications.setNotificationHandler({
-  handleNotification: async () =>
-    ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-    } as any),
-});
 
 import {db} from '@/config/firebase';
 import {
@@ -51,6 +42,7 @@ interface ChatRoom {
   avatarBgColor: string;
   unreadCounts?: {[key: string]: number};
   participants?: string[];
+  createdBy?: string;
 }
 
 interface UserData {
@@ -71,17 +63,6 @@ export default function ChatScreen() {
   const [loadingUsers, setLoadingUsers] = useState(false);
 
   const [userMap, setUserMap] = useState<{[key: string]: string}>({});
-  const isFirstLoad = useRef(true);
-
-  // 0. 알림 권한 요청
-  useEffect(() => {
-    (async () => {
-      const {status} = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') {
-        console.log('알림 권한이 거부되었습니다.');
-      }
-    })();
-  }, []);
 
   // 1. 유저 목록 가져오기 (이름 매칭용) - 한 번만 실행
   useEffect(() => {
@@ -98,83 +79,33 @@ export default function ChatScreen() {
 
   // 2. 채팅방 목록 가져오기
   useEffect(() => {
+    if (!user) return;
     // 유저 정보가 없거나 로딩 중이면 구독하지 않음
-    if (authLoading || !user) {
-      setLoading(false); // 무한 로딩 방지
-      return;
-    }
-
-    setLoading(true); // 구독 시작 시 로딩
-
-    const q = query(collection(db, 'chats'), orderBy('lastMessageAt', 'desc'));
-
+    const chatsRef = collection(db, 'chats');
+    const q = query(
+      chatsRef,
+      where('participants', 'array-contains', user.uid),
+      orderBy('lastMessageAt', 'desc'),
+    );
     const unsubscribe = onSnapshot(
       q,
       snapshot => {
-        const rooms: ChatRoom[] = [];
-
-        snapshot.docs.forEach(doc => {
-          const data = doc.data();
-          const participants = data.participants || [];
-
-          // 내가 포함된 방만 필터링 (JS단 처리)
-          if (participants.includes(user.uid)) {
-            rooms.push({
-              id: doc.id,
-              name: data.name || '알 수 없는 방',
-              lastMessage: data.lastMessage || '대화가 없습니다.',
-              lastMessageAt: data.lastMessageAt,
-              avatarBgColor: '#EAF2FF',
-              unreadCounts: data.unreadCounts || {},
-              participants: participants,
-            });
-          }
-        });
-
-        // 알림 로직: 변경사항 감지
-        if (!isFirstLoad.current) {
-          snapshot.docChanges().forEach(change => {
-            if (change.type === 'modified' || change.type === 'added') {
-              const data = change.doc.data();
-              const participants = data.participants || [];
-              const isLocal = snapshot.metadata.hasPendingWrites;
-
-              // 1. 내가 포함된 방이고
-              // 2. 로컬 변경(내가 보낸 것)이 아니며
-              // 3. 나에게 읽지 않은 메시지가 있을 때
-              if (participants.includes(user.uid) && !isLocal) {
-                const myUnread = data.unreadCounts?.[user.uid] || 0;
-                if (myUnread > 0) {
-                  // 보낸 사람 이름 찾기 (상대방)
-                  let senderName = '새 메시지';
-                  const otherId = participants.find((uid: string) => uid !== user.uid);
-                  if (otherId && userMap[otherId]) {
-                    senderName = userMap[otherId];
-                  } else if (data.name) {
-                    senderName = data.name;
-                  }
-
-                  schedulePushNotification(senderName, data.lastMessage || '사진을 보냈습니다.');
-                }
-              }
-            }
-          });
-        }
-
-        isFirstLoad.current = false;
-
-        setChatList(rooms);
-        setLoading(false);
+        const rooms = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setChatList(rooms as ChatRoom[]);
+        setLoading(false); // 로딩 종료
       },
+      // 2. 실패 시 실행되는 콜백 (이게 없어서 무한 로딩 중일 수 있음)
       error => {
-        console.error('채팅 목록 구독 에러:', error);
-        setLoading(false); // 에러 나도 로딩 끄기
+        console.error('채팅 목록 불러오기 실패:', error);
+        setLoading(false); // 에러가 나도 로딩은 꺼야 함
       },
     );
 
     return () => unsubscribe();
-  }, [user, authLoading, userMap]); // userMap이 업데이트되면 알림 이름도 정확해짐
-
+  }, [user]);
   // (알림 함수 생략 - 동일)
   async function schedulePushNotification(title: string, body: string) {
     await Notifications.scheduleNotificationAsync({
@@ -240,8 +171,16 @@ export default function ChatScreen() {
   const renderChatItem = ({item}: {item: ChatRoom}) => {
     const myUnreadCount = item.unreadCounts?.[user?.uid || ''] || 0;
 
+    // 1. DB에 저장된 채팅방 이름(item.name)이 있으면 그걸 최우선으로 씁니다.
     let displayName = item.name;
-    if (item.participants && item.participants.length > 0) {
+
+    // 2. 만약 채팅방 이름이 비어있다면, 상대방 이름을 찾아서 씁니다.
+    const hasCustomName = item.name && item.name.trim().length > 0;
+
+    // (참고: 로직에 따라 '이름이 유저 이름과 같으면' 상대방 이름으로 보여주는 로직이 필요할 수도 있습니다.
+    // 일단 현재는 DB에 name이 있으면 무조건 그걸 보여줍니다.)
+
+    if (!hasCustomName && item.participants) {
       const otherId = item.participants.find(uid => uid !== user?.uid);
       if (otherId && userMap[otherId]) {
         displayName = userMap[otherId];
@@ -252,7 +191,11 @@ export default function ChatScreen() {
       <TouchableOpacity
         style={styles.chatItem}
         onPress={() =>
-          router.push({pathname: '/chat/[id]', params: {id: item.id, name: displayName}})
+          //[수정됨] 상세 화면으로 갈 때 결정된 displayName을 같이 보냅니다.
+          router.push({
+            pathname: '/chat/[id]',
+            params: {id: item.id, name: displayName},
+          })
         }>
         <View style={styles.avatarContainer}>
           <View style={[styles.avatarHead, {backgroundColor: item.avatarBgColor}]} />
