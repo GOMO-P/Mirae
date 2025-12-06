@@ -7,6 +7,7 @@ import {useColorScheme} from '@/hooks/use-color-scheme';
 import {AuthProvider} from '@/contexts/AuthContext';
 // ✅ GroupProvider 추가
 import {GroupProvider} from '@/contexts/GroupContext';
+import {NotificationListener} from '@/components/NotificationListener';
 
 import {useEffect} from 'react';
 import {useSegments, useRouter} from 'expo-router';
@@ -74,6 +75,7 @@ export default function RootLayout() {
     <AuthProvider>
       {/* ✅ AuthProvider 안쪽에 GroupProvider 배치 (User 정보가 필요할 수 있으므로) */}
       <GroupProvider>
+        <NotificationListener />
         <RootLayoutNav />
       </GroupProvider>
     </AuthProvider>
