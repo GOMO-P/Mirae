@@ -16,6 +16,7 @@ import {
 import {db} from '../config/firebase';
 import {Alert} from 'react-native';
 import {useAuthContext} from './AuthContext';
+import {userService, UserProfile} from '../services/userService';
 
 // ✅ 로컬 임시 데이터 (초기 DB 세팅용)
 const INITIAL_GROUPS_DATA = [
@@ -80,6 +81,7 @@ interface GroupContextType {
   getMonthlyGroups: () => Group[];
   getPopularGroups: () => Group[];
   getMyGroups: () => Group[];
+  getGroupMembers: (groupId: string) => Promise<UserProfile[]>;
 }
 
 const GroupContext = createContext<GroupContextType | undefined>(undefined);
@@ -98,14 +100,6 @@ export function GroupProvider({children}: {children: ReactNode}) {
     const unsubscribe = onSnapshot(
       q,
       async snapshot => {
-        // 🚨 수정된 부분: !loading 체크 제거
-        // DB가 비어있으면 무조건 초기 데이터를 심습니다.
-        if (snapshot.empty) {
-          console.log('📦 DB가 비어있습니다. 초기 데이터를 업로드합니다...');
-          await seedInitialData();
-          return; // 데이터를 넣으면 snapshot이 다시 호출되므로 여기서 종료
-        }
-
         const fetchedGroups: Group[] = snapshot.docs.map(
           doc =>
             ({
@@ -133,30 +127,29 @@ export function GroupProvider({children}: {children: ReactNode}) {
     return () => unsubscribe();
   }, [user]);
 
-  // 🔹 초기 데이터 자동 업로드 함수
-  const seedInitialData = async () => {
-    try {
-      // 중복 방지를 위해 한 번 더 확인
-      const snapshot = await getDocs(collection(db, 'groups'));
-      if (!snapshot.empty) return;
-
-      const batch = writeBatch(db);
-
-      INITIAL_GROUPS_DATA.forEach(group => {
-        const newDocRef = doc(collection(db, 'groups'));
-        batch.set(newDocRef, {
-          ...group,
-          createdAt: Date.now(),
-          members: [],
-        });
-      });
-
-      await batch.commit();
-      console.log('✅ 초기 데이터 업로드 성공!');
-    } catch (e) {
-      console.error('❌ 초기 데이터 업로드 실패:', e);
-    }
-  };
+  // 🔹 초기 데이터 자동 업로드 함수 (비활성화됨)
+  // const seedInitialData = async () => {
+  //   try {
+  //     const snapshot = await getDocs(collection(db, 'groups'));
+  //     if (!snapshot.empty) return;
+  //
+  //     const batch = writeBatch(db);
+  //
+  //     INITIAL_GROUPS_DATA.forEach(group => {
+  //       const newDocRef = doc(collection(db, 'groups'));
+  //       batch.set(newDocRef, {
+  //         ...group,
+  //         createdAt: Date.now(),
+  //         members: [],
+  //       });
+  //     });
+  //
+  //     await batch.commit();
+  //     console.log('✅ 초기 데이터 업로드 성공!');
+  //   } catch (e) {
+  //     console.error('❌ 초기 데이터 업로드 실패:', e);
+  //   }
+  // };
 
   // 2. 그룹 생성 함수
   const addGroup = async (groupData: Omit<Group, 'id' | 'currentMembers' | 'members'>) => {
@@ -171,6 +164,17 @@ export function GroupProvider({children}: {children: ReactNode}) {
     }
 
     try {
+      // 사용자 프로필이 없으면 생성
+      const userProfile = await userService.getUserProfile(user.uid);
+      if (!userProfile) {
+        await userService.updateUserProfile(user.uid, {
+          uid: user.uid,
+          email: user.email || '',
+          displayName: user.displayName || user.email || '익명',
+          photoURL: user.photoURL || undefined,
+        });
+      }
+
       const newGroup = {
         ...groupData,
         currentMembers: 1,
@@ -202,6 +206,17 @@ export function GroupProvider({children}: {children: ReactNode}) {
     if (joinedGroupIds.includes(groupId)) return;
 
     try {
+      // 사용자 프로필이 없으면 생성
+      const userProfile = await userService.getUserProfile(user.uid);
+      if (!userProfile) {
+        await userService.updateUserProfile(user.uid, {
+          uid: user.uid,
+          email: user.email || '',
+          displayName: user.displayName || user.email || '익명',
+          photoURL: user.photoURL || undefined,
+        });
+      }
+
       const groupRef = doc(db, 'groups', groupId);
 
       await updateDoc(groupRef, {
@@ -216,10 +231,32 @@ export function GroupProvider({children}: {children: ReactNode}) {
     }
   };
 
-  const getMonthlyGroups = () => groups.filter(g => g.isMonthly);
-  // 기준 완화: 데이터가 적을 때도 화면에 뜨도록 1명 이상이면 인기 그룹으로 취급
-  const getPopularGroups = () => groups.filter(g => g.currentMembers >= 1);
+  // 이달의 그룹: 최근 생성된 5개의 그룹
+  const getMonthlyGroups = () => {
+    // 이미 createdAt 기준 내림차순으로 정렬되어 있으므로 상위 5개만 반환
+    return groups.slice(0, 5);
+  };
+
+  // 인기 그룹: 7명 이상인 그룹
+  const getPopularGroups = () => groups.filter(g => g.currentMembers >= 7);
+
   const getMyGroups = () => groups.filter(g => joinedGroupIds.includes(g.id));
+
+  // 4. 그룹 멤버 정보 가져오기
+  const getGroupMembers = async (groupId: string): Promise<UserProfile[]> => {
+    try {
+      const group = groups.find(g => g.id === groupId);
+      if (!group || !group.members || group.members.length === 0) {
+        return [];
+      }
+
+      const memberProfiles = await userService.getUserProfiles(group.members);
+      return memberProfiles;
+    } catch (error) {
+      console.error('그룹 멤버 정보 가져오기 실패:', error);
+      return [];
+    }
+  };
 
   return (
     <GroupContext.Provider
@@ -232,6 +269,7 @@ export function GroupProvider({children}: {children: ReactNode}) {
         getMonthlyGroups,
         getPopularGroups,
         getMyGroups,
+        getGroupMembers,
       }}>
       {children}
     </GroupContext.Provider>
