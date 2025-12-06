@@ -1,6 +1,6 @@
 // app/study-cert.tsx
 
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -11,18 +11,21 @@ import {
   ScrollView,
   Image,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {router} from 'expo-router';
-import {addDoc, collection, serverTimestamp} from 'firebase/firestore';
-import {db, storage} from '../../config/firebase';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { db, storage } from '../../config/firebase';
 
 import * as ImagePicker from 'expo-image-picker';
-import {ref, uploadBytes, getDownloadURL} from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-const BLUE = '#316BFF';
-const CARD = '#151515';
-const GRAY = '#A0A4AF';
+const BLUE = '#4A90E2';
+const LIGHT_BG = '#F5F7FA';
+const LIGHT_CARD = '#FFFFFF';
+const GRAY = '#8E8E93';
+const LIGHT_GRAY = '#E5E5EA';
 const WHITE = '#FFFFFF';
+const TEXT_DARK = '#1C1C1E';
 
 const weekdayKo = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -59,7 +62,8 @@ export default function StudyCertScreen() {
 
   // ===== 사진 선택 =====
   const pickImage = async () => {
-    const {status} = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const { status } =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (status !== 'granted') {
       Alert.alert('권한 필요', '앨범 접근 권한을 허용해주세요.');
@@ -123,7 +127,10 @@ export default function StudyCertScreen() {
           const response = await fetch(imageUri);
           const blob = await response.blob();
 
-          const fileRef = ref(storage, `studyCerts/defaultUser/${Date.now()}.jpg`);
+          const fileRef = ref(
+            storage,
+            `studyCerts/defaultUser/${Date.now()}.jpg`,
+          );
 
           await uploadBytes(fileRef, blob);
           imageUrl = await getDownloadURL(fileRef);
@@ -131,7 +138,10 @@ export default function StudyCertScreen() {
           console.log('이미지 업로드 완료', imageUrl);
         } catch (err) {
           console.error('이미지 업로드 에러:', err);
-          Alert.alert('사진 업로드 실패', '사진은 업로드하지 못했지만,\n인증 내용만 저장할게요.');
+          Alert.alert(
+            '사진 업로드 실패',
+            '사진은 업로드하지 못했지만,\n인증 내용만 저장할게요.',
+          );
           // imageUrl은 null 그대로 유지 → 텍스트만 저장
         }
       }
@@ -185,13 +195,17 @@ export default function StudyCertScreen() {
               <TouchableOpacity
                 style={[
                   styles.toggle,
-                  studyMode === 'solo' ? styles.toggleActive : styles.toggleInactive,
+                  studyMode === 'solo'
+                    ? styles.toggleActive
+                    : styles.toggleInactive,
                 ]}
                 onPress={() => setStudyMode('solo')}>
                 <Text
                   style={[
                     styles.toggleText,
-                    studyMode === 'solo' ? styles.toggleTextActive : styles.toggleTextInactive,
+                    studyMode === 'solo'
+                      ? styles.toggleTextActive
+                      : styles.toggleTextInactive,
                   ]}>
                   혼자 공부
                 </Text>
@@ -200,13 +214,17 @@ export default function StudyCertScreen() {
               <TouchableOpacity
                 style={[
                   styles.toggle,
-                  studyMode === 'group' ? styles.toggleActive : styles.toggleInactive,
+                  studyMode === 'group'
+                    ? styles.toggleActive
+                    : styles.toggleInactive,
                 ]}
                 onPress={() => setStudyMode('group')}>
                 <Text
                   style={[
                     styles.toggleText,
-                    studyMode === 'group' ? styles.toggleTextActive : styles.toggleTextInactive,
+                    studyMode === 'group'
+                      ? styles.toggleTextActive
+                      : styles.toggleTextInactive,
                   ]}>
                   다같이 공부
                 </Text>
@@ -223,11 +241,17 @@ export default function StudyCertScreen() {
               <View style={styles.dateBlock}>
                 <Text style={styles.dateBlockLabel}>MONTH</Text>
                 <View style={styles.dateControlRow}>
-                  <TouchableOpacity style={styles.dateBtn} onPress={() => changeMonth(-1)}>
+                  <TouchableOpacity
+                    style={styles.dateBtn}
+                    onPress={() => changeMonth(-1)}>
                     <Text style={styles.dateBtnText}>-</Text>
                   </TouchableOpacity>
-                  <Text style={styles.dateValue}>{String(month).padStart(2, '0')}</Text>
-                  <TouchableOpacity style={styles.dateBtn} onPress={() => changeMonth(1)}>
+                  <Text style={styles.dateValue}>
+                    {String(month).padStart(2, '0')}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.dateBtn}
+                    onPress={() => changeMonth(1)}>
                     <Text style={styles.dateBtnText}>+</Text>
                   </TouchableOpacity>
                 </View>
@@ -237,11 +261,17 @@ export default function StudyCertScreen() {
               <View style={styles.dateBlock}>
                 <Text style={styles.dateBlockLabel}>DAY</Text>
                 <View style={styles.dateControlRow}>
-                  <TouchableOpacity style={styles.dateBtn} onPress={() => changeDay(-1)}>
+                  <TouchableOpacity
+                    style={styles.dateBtn}
+                    onPress={() => changeDay(-1)}>
                     <Text style={styles.dateBtnText}>-</Text>
                   </TouchableOpacity>
-                  <Text style={styles.dateValue}>{String(day).padStart(2, '0')}</Text>
-                  <TouchableOpacity style={styles.dateBtn} onPress={() => changeDay(1)}>
+                  <Text style={styles.dateValue}>
+                    {String(day).padStart(2, '0')}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.dateBtn}
+                    onPress={() => changeDay(1)}>
                     <Text style={styles.dateBtnText}>+</Text>
                   </TouchableOpacity>
                 </View>
@@ -250,7 +280,9 @@ export default function StudyCertScreen() {
               {/* 요일 표시 */}
               <View style={styles.dateBlockSmall}>
                 <Text style={styles.dateBlockLabel}>WEEKDAY</Text>
-                <Text style={[styles.dateValue, {marginTop: 8}]}>{weekday}</Text>
+                <Text style={[styles.dateValue, { marginTop: 8 }]}>
+                  {weekday}
+                </Text>
               </View>
             </View>
 
@@ -261,17 +293,27 @@ export default function StudyCertScreen() {
 
           {/* 3. 사진 + 시간 */}
           <View style={styles.section}>
-            <Text style={styles.subLabel}>공부한 사진과 시간을 알려주세요!</Text>
+            <Text style={styles.subLabel}>
+              공부한 사진과 시간을 알려주세요!
+            </Text>
 
             <View style={styles.timeRow}>
               {/* 사진 박스 */}
-              <TouchableOpacity style={styles.photoBox} onPress={pickImage} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.photoBox}
+                onPress={pickImage}
+                activeOpacity={0.8}>
                 {imageUri ? (
-                  <Image source={{uri: imageUri}} style={styles.photoImage} />
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={styles.photoImage}
+                  />
                 ) : (
                   <>
                     <Text style={styles.photoIcon}>🖼</Text>
-                    <Text style={styles.photoText}>사진 선택하기{'\n'}(한 번 터치해서 선택)</Text>
+                    <Text style={styles.photoText}>
+                      사진 선택하기{'\n'}(한 번 터치해서 선택)
+                    </Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -281,11 +323,17 @@ export default function StudyCertScreen() {
                 <View style={styles.timeBadge}>
                   <Text style={styles.timeTitle}>HOURS</Text>
                   <View style={styles.timeControlRow}>
-                    <TouchableOpacity style={styles.timeButton} onPress={() => changeHours(-1)}>
+                    <TouchableOpacity
+                      style={styles.timeButton}
+                      onPress={() => changeHours(-1)}>
                       <Text style={styles.timeButtonText}>-</Text>
                     </TouchableOpacity>
-                    <Text style={styles.timeValue}>{String(hours).padStart(2, '0')}</Text>
-                    <TouchableOpacity style={styles.timeButton} onPress={() => changeHours(1)}>
+                    <Text style={styles.timeValue}>
+                      {String(hours).padStart(2, '0')}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.timeButton}
+                      onPress={() => changeHours(1)}>
                       <Text style={styles.timeButtonText}>+</Text>
                     </TouchableOpacity>
                   </View>
@@ -294,11 +342,17 @@ export default function StudyCertScreen() {
                 <View style={styles.timeBadge}>
                   <Text style={styles.timeTitle}>MINUTES</Text>
                   <View style={styles.timeControlRow}>
-                    <TouchableOpacity style={styles.timeButton} onPress={() => changeMinutes(-5)}>
+                    <TouchableOpacity
+                      style={styles.timeButton}
+                      onPress={() => changeMinutes(-5)}>
                       <Text style={styles.timeButtonText}>-</Text>
                     </TouchableOpacity>
-                    <Text style={styles.timeValue}>{String(minutes).padStart(2, '0')}</Text>
-                    <TouchableOpacity style={styles.timeButton} onPress={() => changeMinutes(5)}>
+                    <Text style={styles.timeValue}>
+                      {String(minutes).padStart(2, '0')}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.timeButton}
+                      onPress={() => changeMinutes(5)}>
                       <Text style={styles.timeButtonText}>+</Text>
                     </TouchableOpacity>
                   </View>
@@ -309,7 +363,9 @@ export default function StudyCertScreen() {
 
           {/* 4. 설명 입력 */}
           <View style={styles.section}>
-            <Text style={styles.subLabel}>오늘 공부한 내용에 대해 설명해주세요...</Text>
+            <Text style={styles.subLabel}>
+              오늘 공부한 내용에 대해 설명해주세요...
+            </Text>
             <TextInput
               style={styles.textArea}
               multiline
@@ -322,10 +378,15 @@ export default function StudyCertScreen() {
 
           {/* 5. 인증 등록 버튼 */}
           <TouchableOpacity
-            style={[styles.submitButton, submitting && {opacity: 0.6}]}
+            style={[
+              styles.submitButton,
+              submitting && { opacity: 0.6 },
+            ]}
             onPress={handleSubmit}
             disabled={submitting}>
-            <Text style={styles.submitText}>{submitting ? '등록 중...' : '인증 등록하기'}</Text>
+            <Text style={styles.submitText}>
+              {submitting ? '등록 중...' : '인증 등록하기'}
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -336,7 +397,7 @@ export default function StudyCertScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: LIGHT_BG,
   },
   container: {
     paddingTop: 24,
@@ -351,17 +412,22 @@ const styles = StyleSheet.create({
   back: {
     fontSize: 20,
     marginRight: 12,
-    color: WHITE,
+    color: '#000',
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: WHITE,
+    color: '#000',
   },
   card: {
-    backgroundColor: CARD,
+    backgroundColor: LIGHT_CARD,
     borderRadius: 20,
     padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   section: {
     marginBottom: 20,
@@ -370,13 +436,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     marginBottom: 8,
-    color: WHITE,
+    color: TEXT_DARK,
   },
   subLabel: {
     fontSize: 13,
     fontWeight: '600',
     marginBottom: 8,
-    color: WHITE,
+    color: TEXT_DARK,
   },
   toggleRow: {
     flexDirection: 'row',
@@ -412,18 +478,22 @@ const styles = StyleSheet.create({
   },
   dateBlock: {
     flex: 1,
-    backgroundColor: '#202020',
+    backgroundColor: LIGHT_BG,
     borderRadius: 16,
     paddingVertical: 8,
     marginRight: 8,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
   },
   dateBlockSmall: {
     width: 90,
-    backgroundColor: '#202020',
+    backgroundColor: LIGHT_BG,
     borderRadius: 16,
     paddingVertical: 8,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
   },
   dateBlockLabel: {
     fontSize: 11,
@@ -438,12 +508,12 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: '#303030',
+    backgroundColor: LIGHT_GRAY,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dateBtnText: {
-    color: WHITE,
+    color: TEXT_DARK,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -469,7 +539,8 @@ const styles = StyleSheet.create({
     height: 96,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#303030',
+    borderColor: LIGHT_GRAY,
+    backgroundColor: LIGHT_BG,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -494,10 +565,12 @@ const styles = StyleSheet.create({
   },
   timeBadge: {
     borderRadius: 16,
-    backgroundColor: '#202020',
+    backgroundColor: LIGHT_BG,
     alignItems: 'center',
     paddingVertical: 8,
     marginBottom: 6,
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
   },
   timeTitle: {
     fontSize: 11,
@@ -512,12 +585,12 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#303030',
+    backgroundColor: LIGHT_GRAY,
     alignItems: 'center',
     justifyContent: 'center',
   },
   timeButtonText: {
-    color: WHITE,
+    color: TEXT_DARK,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -533,11 +606,12 @@ const styles = StyleSheet.create({
     minHeight: 120,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#303030',
+    borderColor: LIGHT_GRAY,
+    backgroundColor: LIGHT_BG,
     padding: 12,
     textAlignVertical: 'top',
     fontSize: 13,
-    color: WHITE,
+    color: TEXT_DARK,
   },
   submitButton: {
     marginTop: 8,
