@@ -1,5 +1,12 @@
-import React, {useState} from 'react';
-import {View, Text, StyleSheet, TouchableOpacity, useColorScheme} from 'react-native';
+import React from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  useColorScheme,
+  ActivityIndicator,
+} from 'react-native';
 import {Colors, Typography, Spacing, BorderRadius} from '@/constants/design-tokens';
 import Avatar from '@/components/ui/Avatar'; // 기존 Avatar 컴포넌트 재사용
 
@@ -15,6 +22,8 @@ interface MemberListItemProps {
   onFollowRequest: () => void;
   isDark: boolean;
   showFollowButton?: boolean; // 팔로우 버튼 표시 여부
+  isFollowing?: boolean; // 팔로우 상태
+  isLoading?: boolean; // 로딩 상태
 }
 
 export default function MemberListItem({
@@ -22,17 +31,12 @@ export default function MemberListItem({
   onFollowRequest,
   isDark,
   showFollowButton = true,
+  isFollowing = false,
+  isLoading = false,
 }: MemberListItemProps) {
-  const [isFollowing, setIsFollowing] = useState(false);
-
   const cardBg = isDark ? Colors.background.paper.dark : Colors.background.paper.light;
   const textColor = isDark ? Colors.text.primary.dark : Colors.text.primary.light;
   const secondaryTextColor = isDark ? Colors.text.secondary.dark : Colors.text.secondary.light;
-
-  const handleFollow = () => {
-    onFollowRequest();
-    setIsFollowing(true); // 요청 완료 후 상태 변경 (API 호출 대신 시뮬레이션)
-  };
 
   return (
     <View style={[styles.card, {backgroundColor: cardBg}]}>
@@ -49,19 +53,27 @@ export default function MemberListItem({
 
       {showFollowButton && (
         <TouchableOpacity
-          style={styles.followButton}
-          onPress={handleFollow}
-          disabled={isFollowing}
+          style={[
+            styles.followButton,
+            isFollowing && styles.unfollowButton,
+            isLoading && styles.loadingButton,
+          ]}
+          onPress={onFollowRequest}
+          disabled={isLoading}
           activeOpacity={0.7}>
-          <Text
-            style={[
-              styles.followButtonText,
-              {
-                color: isFollowing ? secondaryTextColor : Colors.primary[600],
-              },
-            ]}>
-            {isFollowing ? '요청됨' : '팔로우 요청'}
-          </Text>
+          {isLoading ? (
+            <ActivityIndicator size="small" color={Colors.primary[600]} />
+          ) : (
+            <Text
+              style={[
+                styles.followButtonText,
+                {
+                  color: isFollowing ? Colors.error.main : Colors.primary[600],
+                },
+              ]}>
+              {isFollowing ? '언팔로우' : '팔로우'}
+            </Text>
+          )}
         </TouchableOpacity>
       )}
     </View>
@@ -96,6 +108,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.primary[600],
     backgroundColor: 'transparent',
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  unfollowButton: {
+    borderColor: Colors.error.main,
+  },
+  loadingButton: {
+    opacity: 0.7,
   },
   followButtonText: {
     fontSize: Typography.fontSize.sm,

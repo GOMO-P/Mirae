@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useAuthContext} from '@/contexts/AuthContext';
-import {useRouter} from 'expo-router';
+import {useRouter, usePathname} from 'expo-router';
 import useAuth from '@/hooks/useAuth';
 import {Colors, Typography, Spacing, BorderRadius} from '@/constants/design-tokens';
 import {Ionicons} from '@expo/vector-icons';
@@ -24,29 +24,18 @@ export default function SettingsScreen() {
   const {user} = useAuthContext();
   const {logout} = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [deviceModalVisible, setDeviceModalVisible] = useState(false);
   const [photoURL, setPhotoURL] = useState<string | undefined>(undefined);
-  const [isProfileLoaded, setIsProfileLoaded] = useState(false);
 
-  // 화면 포커스 시 프로필 로드 (다른 화면 갔다가 돌아올 때 업데이트된 사진 반영)
-  useFocusEffect(
-    React.useCallback(() => {
-      if (user?.uid && !isProfileLoaded) {
-        loadUserProfile();
-      }
-    }, [user?.uid, isProfileLoaded]),
-  );
-
-  // 프로필 관리에서 돌아올 때 갱신
-  useFocusEffect(
-    React.useCallback(() => {
-      if (user?.uid) {
-        loadUserProfile();
-      }
-    }, []),
-  );
+  // 화면 진입 시 및 다른 화면에서 돌아올 때 프로필 로드
+  useEffect(() => {
+    if (user?.uid && pathname === '/profile') {
+      loadUserProfile();
+    }
+  }, [user?.uid, pathname]);
 
   const loadUserProfile = async () => {
     if (!user?.uid) return;
@@ -54,7 +43,6 @@ export default function SettingsScreen() {
     if (profile?.photoURL) {
       setPhotoURL(profile.photoURL);
     }
-    setIsProfileLoaded(true);
   };
 
   const backgroundColor = isDark ? Colors.background.dark : Colors.background.light;
