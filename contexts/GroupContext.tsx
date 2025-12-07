@@ -9,54 +9,12 @@ import {
   query,
   orderBy,
   onSnapshot,
-  writeBatch,
-  getDocs,
 } from 'firebase/firestore';
 // 🔹 상대 경로로 수정 (폴더 구조에 맞게)
 import {db} from '../config/firebase';
 import {Alert} from 'react-native';
 import {useAuthContext} from './AuthContext';
 import {userService, UserProfile} from '../services/userService';
-
-// ✅ 로컬 임시 데이터 (초기 DB 세팅용)
-const INITIAL_GROUPS_DATA = [
-  {
-    name: '일상생활에서 자유롭게',
-    description: '일상기록, 여행, 취미 공유',
-    currentMembers: 20,
-    maxMembers: 50,
-    categories: ['커뮤니티'],
-    isMonthly: true,
-    imageUrl: '',
-  },
-  {
-    name: '독서 모임',
-    description: '책을 읽고 토론하는 모임',
-    currentMembers: 10,
-    maxMembers: 50,
-    categories: ['독서'],
-    isMonthly: true,
-    imageUrl: '',
-  },
-  {
-    name: '넥슨게임 팀원구해요',
-    description: '넥슨게임 팀원 모집',
-    currentMembers: 48,
-    maxMembers: 50,
-    categories: ['게임'],
-    isMonthly: false,
-    imageUrl: '',
-  },
-  {
-    name: '경기자치대학 동아리',
-    description: '경기자치대학 학생 모임',
-    currentMembers: 27,
-    maxMembers: 50,
-    categories: ['학교'],
-    isMonthly: false,
-    imageUrl: '',
-  },
-];
 
 export interface Group {
   id: string;
@@ -126,30 +84,6 @@ export function GroupProvider({children}: {children: ReactNode}) {
 
     return () => unsubscribe();
   }, [user]);
-
-  // 🔹 초기 데이터 자동 업로드 함수 (비활성화됨)
-  // const seedInitialData = async () => {
-  //   try {
-  //     const snapshot = await getDocs(collection(db, 'groups'));
-  //     if (!snapshot.empty) return;
-  //
-  //     const batch = writeBatch(db);
-  //
-  //     INITIAL_GROUPS_DATA.forEach(group => {
-  //       const newDocRef = doc(collection(db, 'groups'));
-  //       batch.set(newDocRef, {
-  //         ...group,
-  //         createdAt: Date.now(),
-  //         members: [],
-  //       });
-  //     });
-  //
-  //     await batch.commit();
-  //     console.log('✅ 초기 데이터 업로드 성공!');
-  //   } catch (e) {
-  //     console.error('❌ 초기 데이터 업로드 실패:', e);
-  //   }
-  // };
 
   // 2. 그룹 생성 함수
   const addGroup = async (groupData: Omit<Group, 'id' | 'currentMembers' | 'members'>) => {

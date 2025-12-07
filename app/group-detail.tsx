@@ -69,6 +69,8 @@ export default function GroupDetailScreen() {
   const [isJoining, setIsJoining] = useState(false);
   const [members, setMembers] = useState<UserProfile[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
+  const [hasApplied, setHasApplied] = useState(false);
+  const [loadingApplicationStatus, setLoadingApplicationStatus] = useState(true);
 
   // 실제 멤버 정보 가져오기
   useEffect(() => {
@@ -91,6 +93,46 @@ export default function GroupDetailScreen() {
     fetchMembers();
   }, [id, getGroupMembers]);
 
+  // 지원 상태 확인 (화면이 포커스될 때마다 체크)
+  useEffect(() => {
+    const checkApplicationStatus = async () => {
+      if (!id || !user) {
+        setLoadingApplicationStatus(false);
+        return;
+      }
+
+      setLoadingApplicationStatus(true);
+      try {
+        const {collection, query, where, getDocs} = await import('firebase/firestore');
+        const {db} = await import('@/config/firebase');
+
+        const q = query(
+          collection(db, 'groupApplications'),
+          where('groupId', '==', id),
+          where('userId', '==', user.uid),
+          where('status', '==', 'pending'),
+        );
+
+        const snapshot = await getDocs(q);
+        setHasApplied(!snapshot.empty);
+      } catch (error) {
+        console.error('지원 상태 확인 실패:', error);
+        setHasApplied(false);
+      } finally {
+        setLoadingApplicationStatus(false);
+      }
+    };
+
+    checkApplicationStatus();
+
+    // 화면이 포커스될 때마다 다시 체크
+    const unsubscribe = navigation.addListener('focus', () => {
+      checkApplicationStatus();
+    });
+
+    return unsubscribe;
+  }, [id, user, navigation]);
+
   const backgroundColor = isDark ? Colors.background.dark : '#E3F2FD';
   const textColor = isDark ? Colors.text.primary.dark : Colors.text.primary.light;
   const secondaryTextColor = isDark ? Colors.text.secondary.dark : Colors.text.secondary.light;
@@ -104,6 +146,10 @@ export default function GroupDetailScreen() {
   const handleJoinGroup = () => {
     if (isAlreadyJoined) {
       Alert.alert('알림', '이미 가입한 그룹입니다.');
+      return;
+    }
+    if (hasApplied) {
+      Alert.alert('알림', '이미 지원한 그룹입니다. 승인을 기다려주세요.');
       return;
     }
     // 지원서 화면으로 이동
@@ -220,10 +266,16 @@ export default function GroupDetailScreen() {
           },
         ]}>
         <Button
-          title={isAlreadyJoined ? '이미 가입한 그룹입니다' : '그룹 참여하기'}
+          title={
+            isAlreadyJoined
+              ? '이미 가입한 그룹입니다'
+              : hasApplied
+              ? '지원한 그룹입니다'
+              : '그룹 참여하기'
+          }
           onPress={handleJoinGroup}
-          loading={isJoining}
-          disabled={isAlreadyJoined}
+          loading={isJoining || loadingApplicationStatus}
+          disabled={isAlreadyJoined || hasApplied}
           fullWidth
           size="md"
         />

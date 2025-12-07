@@ -93,6 +93,7 @@ export default function ExploreScreen() {
                   id={group.id}
                   name={group.name}
                   description={group.description}
+                  imageUrl={group.imageUrl}
                   // ✅ Firebase 데이터 필드 매핑
                   memberCount={group.currentMembers || 0}
                   // 카테고리가 배열이므로 첫 번째 요소를 가져오고, 없으면 '기타' 표시
@@ -126,6 +127,7 @@ export default function ExploreScreen() {
                   id={group.id}
                   name={group.name}
                   description={group.description}
+                  imageUrl={group.imageUrl}
                   // ✅ Firebase 데이터 필드 매핑
                   memberCount={group.currentMembers || 0}
                   category={group.categories?.[0] || '기타'}

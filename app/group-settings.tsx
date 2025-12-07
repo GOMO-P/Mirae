@@ -8,10 +8,10 @@ import {
   Alert,
   TextInput,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRouter, useLocalSearchParams, Stack} from 'expo-router';
-import {Ionicons} from '@expo/vector-icons';
 import {useGroupContext} from '@/contexts/GroupContext';
 import {useAuthContext} from '@/contexts/AuthContext';
 import {UserProfile} from '@/services/userService';
@@ -25,8 +25,24 @@ import {
   collection,
   where,
   getDocs,
+  onSnapshot,
+  arrayUnion,
 } from 'firebase/firestore';
 import {db} from '@/config/firebase';
+import * as ImagePicker from 'expo-image-picker';
+import {Ionicons} from '@expo/vector-icons';
+
+interface Application {
+  id: string;
+  groupId: string;
+  userId: string;
+  name: string;
+  major: string;
+  intro: string;
+  availableDays: string[];
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: any;
+}
 
 const BLUE = '#4A90E2';
 const BG = '#000000';
@@ -37,17 +53,32 @@ const GRAY = '#8E8E93';
 const LIGHT_GRAY = '#E5E5EA';
 const TEXT_DARK = '#1C1C1E';
 
+const DAYS_MAP: {[key: string]: string} = {
+  mon: '월',
+  tue: '화',
+  wed: '수',
+  thu: '목',
+  fri: '금',
+  sat: '토',
+  sun: '일',
+};
+
 export default function GroupSettingsScreen() {
   const router = useRouter();
   const {id} = useLocalSearchParams<{id: string}>();
   const {groups, getGroupMembers} = useGroupContext();
   const {user} = useAuthContext();
 
+  const [activeTab, setActiveTab] = useState<'members' | 'applications'>('members');
   const [members, setMembers] = useState<UserProfile[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [isEditingName, setIsEditingName] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupImage, setNewGroupImage] = useState<string>('');
+  const [isEditingImage, setIsEditingImage] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loadingApplications, setLoadingApplications] = useState(true);
 
   const currentGroup = groups.find(g => g.id === id);
   const isCreator = currentGroup?.createdBy === user?.uid;
@@ -71,11 +102,93 @@ export default function GroupSettingsScreen() {
     fetchMembers();
   }, [id, getGroupMembers]);
 
+  // 지원서 실시간 구독
+  useEffect(() => {
+    if (!id) {
+      setLoadingApplications(false);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'groupApplications'),
+      where('groupId', '==', id),
+      where('status', '==', 'pending'),
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      snapshot => {
+        const apps: Application[] = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Application[];
+        setApplications(apps);
+        setLoadingApplications(false);
+      },
+      error => {
+        console.error('지원서 로드 실패:', error);
+        setLoadingApplications(false);
+      },
+    );
+
+    return () => unsubscribe();
+  }, [id]);
+
   useEffect(() => {
     if (currentGroup) {
       setNewGroupName(currentGroup.name);
+      setNewGroupImage(currentGroup.imageUrl || '');
     }
   }, [currentGroup]);
+
+  const handlePickImage = async () => {
+    const {status} = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (status !== 'granted') {
+      Alert.alert('권한 필요', '사진을 선택하려면 갤러리 접근 권한이 필요합니다.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setNewGroupImage(result.assets[0].uri);
+      setIsEditingImage(true);
+    }
+  };
+
+  const handleUpdateGroupImage = async () => {
+    if (!id) {
+      Alert.alert('오류', '그룹 정보를 찾을 수 없습니다.');
+      return;
+    }
+
+    if (!isCreator) {
+      Alert.alert('권한 없음', '그룹 생성자만 이미지를 변경할 수 있습니다.');
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      const groupRef = doc(db, 'groups', id);
+      await updateDoc(groupRef, {
+        imageUrl: newGroupImage,
+      });
+
+      Alert.alert('성공', '그룹 이미지가 변경되었습니다.');
+      setIsEditingImage(false);
+    } catch (error) {
+      console.error('그룹 이미지 변경 실패:', error);
+      Alert.alert('오류', '그룹 이미지 변경에 실패했습니다.');
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   const handleUpdateGroupName = async () => {
     if (!id || !newGroupName.trim()) {
@@ -187,6 +300,54 @@ export default function GroupSettingsScreen() {
     );
   };
 
+  const handleApproveApplication = async (application: Application) => {
+    if (!id) return;
+
+    try {
+      // 1. 그룹에 멤버 추가
+      const groupRef = doc(db, 'groups', id);
+      await updateDoc(groupRef, {
+        members: arrayUnion(application.userId),
+        currentMembers: increment(1),
+      });
+
+      // 2. 지원서 상태 업데이트
+      const appRef = doc(db, 'groupApplications', application.id);
+      await updateDoc(appRef, {
+        status: 'approved',
+      });
+
+      Alert.alert('승인 완료', `${application.name}님의 가입을 승인했습니다.`);
+    } catch (error) {
+      console.error('승인 실패:', error);
+      Alert.alert('오류', '승인에 실패했습니다.');
+    }
+  };
+
+  const handleRejectApplication = async (application: Application) => {
+    if (!id) return;
+
+    Alert.alert('지원 거절', `${application.name}님의 지원을 거절하시겠습니까?`, [
+      {text: '취소', style: 'cancel'},
+      {
+        text: '거절',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const appRef = doc(db, 'groupApplications', application.id);
+            await updateDoc(appRef, {
+              status: 'rejected',
+            });
+            Alert.alert('거절 완료', '지원을 거절했습니다.');
+          } catch (error) {
+            console.error('거절 실패:', error);
+            Alert.alert('오류', '거절에 실패했습니다.');
+          }
+        },
+      },
+    ]);
+  };
+
   const renderMemberItem = (item: UserProfile, index: number) => {
     const role = index === 0 ? '방장' : '팀원';
     const isCurrentUser = user?.uid === item.uid;
@@ -212,6 +373,41 @@ export default function GroupSettingsScreen() {
     );
   };
 
+  const renderApplicationItem = (application: Application) => {
+    const daysText = application.availableDays.map(d => DAYS_MAP[d] || d).join(', ');
+    
+    return (
+      <View key={application.id} style={styles.applicationItem}>
+        <View style={styles.applicationContent}>
+          <Text style={styles.applicationText}>
+            <Text style={styles.applicationLabel}>이름: </Text>
+            <Text style={styles.applicationValue}>{application.name}</Text>
+            <Text style={styles.applicationLabel}> / 학과: </Text>
+            <Text style={styles.applicationValue}>{application.major}</Text>
+            <Text style={styles.applicationLabel}> / 참여 요일: </Text>
+            <Text style={styles.applicationValue}>{daysText}</Text>
+          </Text>
+          <Text style={styles.applicationIntro} numberOfLines={3}>
+            <Text style={styles.applicationLabel}>소개: </Text>
+            {application.intro}
+          </Text>
+        </View>
+        <View style={styles.applicationButtons}>
+          <TouchableOpacity
+            style={[styles.applicationButton, styles.rejectButton]}
+            onPress={() => handleRejectApplication(application)}>
+            <Text style={styles.rejectButtonText}>거절</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.applicationButton, styles.approveButton]}
+            onPress={() => handleApproveApplication(application)}>
+            <Text style={styles.approveButtonText}>승인</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <Stack.Screen options={{headerShown: false}} />
@@ -226,6 +422,55 @@ export default function GroupSettingsScreen() {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* 그룹 이미지 */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>그룹 이미지</Text>
+            {isCreator && (
+              <TouchableOpacity onPress={handlePickImage}>
+                <Text style={styles.editButton}>변경</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <TouchableOpacity 
+            style={styles.imageContainer} 
+            onPress={isCreator ? handlePickImage : undefined}
+            disabled={!isCreator}>
+            {newGroupImage ? (
+              <Image source={{uri: newGroupImage}} style={styles.groupImage} />
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <Ionicons name="image-outline" size={40} color={GRAY} />
+                <Text style={styles.imagePlaceholderText}>이미지 없음</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {isEditingImage && (
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={[styles.smallButton, styles.cancelButton]}
+                onPress={() => {
+                  setIsEditingImage(false);
+                  setNewGroupImage(currentGroup?.imageUrl || '');
+                }}>
+                <Text style={styles.cancelButtonText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.smallButton, styles.saveButton]}
+                onPress={handleUpdateGroupImage}
+                disabled={updating}>
+                {updating ? (
+                  <ActivityIndicator size="small" color={WHITE} />
+                ) : (
+                  <Text style={styles.saveButtonText}>저장</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
         {/* 그룹 이름 */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -272,18 +517,59 @@ export default function GroupSettingsScreen() {
           )}
         </View>
 
-        {/* 멤버 목록 */}
+        {/* 탭 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>멤버 ({members.length}명)</Text>
-          {loadingMembers ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={BLUE} />
-              <Text style={styles.loadingText}>멤버 정보를 불러오는 중...</Text>
-            </View>
-          ) : (
-            <View style={styles.memberList}>
-              {members.map((member, index) => renderMemberItem(member, index))}
-            </View>
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'members' && styles.activeTab]}
+              onPress={() => setActiveTab('members')}>
+              <Text style={[styles.tabText, activeTab === 'members' && styles.activeTabText]}>
+                멤버 목록 ({members.length})
+              </Text>
+            </TouchableOpacity>
+            {isCreator && (
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'applications' && styles.activeTab]}
+                onPress={() => setActiveTab('applications')}>
+                <Text style={[styles.tabText, activeTab === 'applications' && styles.activeTabText]}>
+                  지원서 목록 ({applications.length})
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* 멤버 목록 탭 */}
+          {activeTab === 'members' && (
+            <>
+              {loadingMembers ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color={BLUE} />
+                  <Text style={styles.loadingText}>멤버 정보를 불러오는 중...</Text>
+                </View>
+              ) : (
+                <View style={styles.memberList}>
+                  {members.map((member, index) => renderMemberItem(member, index))}
+                </View>
+              )}
+            </>
+          )}
+
+          {/* 지원서 목록 탭 (생성자만) */}
+          {activeTab === 'applications' && isCreator && (
+            <>
+              {loadingApplications ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color={BLUE} />
+                  <Text style={styles.loadingText}>지원서를 불러오는 중...</Text>
+                </View>
+              ) : applications.length === 0 ? (
+                <Text style={styles.emptyText}>대기 중인 지원서가 없습니다</Text>
+              ) : (
+                <View style={styles.applicationList}>
+                  {applications.map(app => renderApplicationItem(app))}
+                </View>
+              )}
+            </>
           )}
         </View>
 
@@ -478,5 +764,114 @@ const styles = StyleSheet.create({
     color: WHITE,
     fontSize: 15,
     fontWeight: '600',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 2,
+    borderBottomColor: LIGHT_GRAY,
+    marginBottom: 16,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  activeTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: BLUE,
+    marginBottom: -2,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: GRAY,
+  },
+  activeTabText: {
+    color: BLUE,
+    fontWeight: '600',
+  },
+  applicationList: {
+    marginTop: 8,
+  },
+  applicationItem: {
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: LIGHT_GRAY,
+  },
+  applicationContent: {
+    marginBottom: 12,
+  },
+  applicationText: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  applicationLabel: {
+    fontWeight: '600',
+    color: TEXT_DARK,
+  },
+  applicationValue: {
+    color: TEXT_DARK,
+  },
+  applicationIntro: {
+    fontSize: 13,
+    color: GRAY,
+    lineHeight: 18,
+  },
+  applicationButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  applicationButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  rejectButton: {
+    backgroundColor: LIGHT_GRAY,
+  },
+  rejectButtonText: {
+    color: TEXT_DARK,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  approveButton: {
+    backgroundColor: BLUE,
+  },
+  approveButtonText: {
+    color: WHITE,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: GRAY,
+    fontSize: 14,
+    paddingVertical: 20,
+  },
+  imageContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    overflow: 'hidden',
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  groupImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: LIGHT_BG,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePlaceholderText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: GRAY,
   },
 });

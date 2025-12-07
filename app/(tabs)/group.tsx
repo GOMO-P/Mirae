@@ -1,21 +1,53 @@
-import React from 'react';
+import React, {useState, useEffect} from 'react';
 import {View, Text, StyleSheet, TouchableOpacity, FlatList, useColorScheme} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 import {useGroupContext} from '@/contexts/GroupContext';
+import {useAuthContext} from '@/contexts/AuthContext';
 import {Ionicons} from '@expo/vector-icons';
 import {Colors, Typography, Spacing, BorderRadius} from '@/constants/design-tokens';
 import Avatar from '@/components/ui/Avatar';
+import {collection, query, where, onSnapshot} from 'firebase/firestore';
+import {db} from '@/config/firebase';
 
 export default function GroupScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const {getMyGroups} = useGroupContext();
+  const {getMyGroups, groups} = useGroupContext();
+  const {user} = useAuthContext();
   const myGroups = getMyGroups();
+  const [applicationCounts, setApplicationCounts] = useState<{[groupId: string]: number}>({});
 
   const backgroundColor = isDark ? Colors.background.dark : Colors.background.light;
   const textColor = isDark ? Colors.text.primary.dark : Colors.text.primary.light;
   const secondaryTextColor = isDark ? Colors.text.secondary.dark : Colors.text.secondary.light;
+
+  // 지원서 수 실시간 구독 (생성자인 그룹만)
+  useEffect(() => {
+    if (!user || myGroups.length === 0) return;
+
+    const myCreatedGroups = myGroups.filter(g => g.createdBy === user.uid);
+    if (myCreatedGroups.length === 0) return;
+
+    const unsubscribes = myCreatedGroups.map(group => {
+      const q = query(
+        collection(db, 'groupApplications'),
+        where('groupId', '==', group.id),
+        where('status', '==', 'pending'),
+      );
+
+      return onSnapshot(q, snapshot => {
+        setApplicationCounts(prev => ({
+          ...prev,
+          [group.id]: snapshot.size,
+        }));
+      });
+    });
+
+    return () => {
+      unsubscribes.forEach(unsub => unsub());
+    };
+  }, [user, myGroups.length]);
 
   const handleGroupPress = (groupId: string) => {
     router.push({
@@ -24,26 +56,38 @@ export default function GroupScreen() {
     });
   };
 
-  const renderGroupItem = ({item}: {item: any}) => (
-    <TouchableOpacity
-      style={[styles.groupCard, {backgroundColor: isDark ? Colors.background.paper.dark : '#FFFFFF'}]}
-      onPress={() => handleGroupPress(item.id)}
-      activeOpacity={0.7}>
-      <Avatar name={item.name} imageUri={item.imageUrl} size="md" />
-      <View style={styles.groupInfo}>
-        <Text style={[styles.groupName, {color: textColor}]} numberOfLines={1}>
-          {item.name}
-        </Text>
-        <Text style={[styles.groupDescription, {color: secondaryTextColor}]} numberOfLines={1}>
-          {item.description}
-        </Text>
-        <Text style={[styles.memberCount, {color: secondaryTextColor}]}>
-          {item.currentMembers}명
-        </Text>
-      </View>
-      <Ionicons name="chevron-forward" size={20} color={secondaryTextColor} />
-    </TouchableOpacity>
-  );
+  const renderGroupItem = ({item}: {item: any}) => {
+    const isCreator = item.createdBy === user?.uid;
+    const appCount = applicationCounts[item.id] || 0;
+    
+    return (
+      <TouchableOpacity
+        style={[styles.groupCard, {backgroundColor: isDark ? Colors.background.paper.dark : '#FFFFFF'}]}
+        onPress={() => handleGroupPress(item.id)}
+        activeOpacity={0.7}>
+        <Avatar name={item.name} imageUri={item.imageUrl} size="md" />
+        <View style={styles.groupInfo}>
+          <View style={styles.groupNameRow}>
+            <Text style={[styles.groupName, {color: textColor}]} numberOfLines={1}>
+              {item.name}
+            </Text>
+            {isCreator && appCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{appCount}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={[styles.groupDescription, {color: secondaryTextColor}]} numberOfLines={1}>
+            {item.description}
+          </Text>
+          <Text style={[styles.memberCount, {color: secondaryTextColor}]}>
+            {item.currentMembers}명
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={secondaryTextColor} />
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor}]} edges={['top']}>
@@ -117,10 +161,29 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: Spacing.sm,
   },
+  groupNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   groupName: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
     marginBottom: 2,
+  },
+  badge: {
+    backgroundColor: Colors.primary[600],
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: Typography.fontWeight.bold,
   },
   groupDescription: {
     fontSize: Typography.fontSize.xs,

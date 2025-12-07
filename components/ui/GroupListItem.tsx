@@ -1,5 +1,5 @@
 import React from 'react';
-import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
+import {View, Text, StyleSheet, TouchableOpacity, Image} from 'react-native';
 import {Colors, Typography, Spacing, BorderRadius} from '@/constants/design-tokens';
 import {Ionicons} from '@expo/vector-icons';
 
@@ -9,6 +9,7 @@ interface GroupItemProps {
   description: string;
   currentMembers: number;
   maxMembers: number;
+  imageUrl?: string;
 }
 
 interface GroupListItemProps {
@@ -27,16 +28,19 @@ export default function GroupListItem({group, onPress, isDark}: GroupListItemPro
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
-      {/* Thumbnail Placeholder */}
+      {/* Thumbnail */}
       <View
         style={[
           styles.thumbnail,
           {
             backgroundColor: thumbnailBackgroundColor,
-            // 테두리 제거 (이미지상 테두리가 거의 안보이거나 아주 부드러움)
           },
         ]}>
-        <Ionicons name="image-outline" size={28} color={thumbnailIconColor} />
+        {group.imageUrl ? (
+          <Image source={{uri: group.imageUrl}} style={styles.thumbnailImage} />
+        ) : (
+          <Ionicons name="image-outline" size={28} color={thumbnailIconColor} />
+        )}
       </View>
 
       {/* Group Info & Member Count Layout */}
@@ -76,6 +80,11 @@ const styles = StyleSheet.create({
     marginRight: Spacing.md,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
   },
   contentContainer: {
     flex: 1,
