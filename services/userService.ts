@@ -1,5 +1,16 @@
-import {doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, increment} from 'firebase/firestore';
-import {db} from '../config/firebase';
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  writeBatch,
+  increment,
+  collection,
+  getDocs,
+} from 'firebase/firestore';
+import {ref, uploadBytes, getDownloadURL} from 'firebase/storage';
+import {db, storage} from '../config/firebase';
 
 export interface UserProfile {
   uid: string;
@@ -24,14 +35,14 @@ export const userService = {
 
       if (docSnap.exists()) {
         const data = docSnap.data();
-        
+
         // 안전하게 문자열로 변환 (name 필드 하위 호환성)
-        const displayName = data.displayName 
-          ? String(data.displayName) 
-          : data.name 
-            ? String(data.name) 
-            : undefined;
-        
+        const displayName = data.displayName
+          ? String(data.displayName)
+          : data.name
+          ? String(data.name)
+          : undefined;
+
         return {
           uid: docSnap.id,
           email: data.email,
@@ -192,6 +203,80 @@ export const userService = {
     } catch (error) {
       console.error('Error fetching user profiles:', error);
       return [];
+    }
+  },
+
+  // Check if mutual follow (both users follow each other)
+  async isMutualFollow(userId1: string, userId2: string): Promise<boolean> {
+    try {
+      const user1FollowsUser2 = await this.isFollowing(userId1, userId2);
+      const user2FollowsUser1 = await this.isFollowing(userId2, userId1);
+      return user1FollowsUser2 && user2FollowsUser1;
+    } catch (error) {
+      console.error('Error checking mutual follow:', error);
+      return false;
+    }
+  },
+
+  // Get followers list
+  async getFollowers(userId: string): Promise<UserProfile[]> {
+    try {
+      const followersRef = collection(db, USERS_COLLECTION, userId, 'followers');
+      const snapshot = await getDocs(followersRef);
+
+      if (snapshot.empty) return [];
+
+      const followerIds = snapshot.docs.map(doc => doc.id);
+      // 병렬로 프로필 조회
+      const profiles = await Promise.all(followerIds.map(id => this.getUserProfile(id)));
+      return profiles.filter((p): p is UserProfile => p !== null);
+    } catch (error) {
+      console.error('Error getting followers:', error);
+      return [];
+    }
+  },
+
+  // Get following list
+  async getFollowing(userId: string): Promise<UserProfile[]> {
+    try {
+      const followingRef = collection(db, USERS_COLLECTION, userId, 'following');
+      const snapshot = await getDocs(followingRef);
+
+      if (snapshot.empty) return [];
+
+      const followingIds = snapshot.docs.map(doc => doc.id);
+      // 병렬로 프로필 조회
+      const profiles = await Promise.all(followingIds.map(id => this.getUserProfile(id)));
+      return profiles.filter((p): p is UserProfile => p !== null);
+    } catch (error) {
+      console.error('Error getting following:', error);
+      return [];
+    }
+  },
+
+  // Upload profile photo
+  async uploadProfilePhoto(uid: string, uri: string): Promise<string> {
+    try {
+      // Fetch the image and convert to blob
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      // Create a reference to the storage location
+      const storageRef = ref(storage, `profile_photos/${uid}`);
+
+      // Upload the blob
+      await uploadBytes(storageRef, blob);
+
+      // Get the download URL
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // Update user profile with new photo URL
+      await this.updateUserProfile(uid, {photoURL: downloadURL});
+
+      return downloadURL;
+    } catch (error) {
+      console.error('Error uploading profile photo:', error);
+      throw error;
     }
   },
 };

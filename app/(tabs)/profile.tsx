@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import useAuth from '@/hooks/useAuth';
 import {Colors, Typography, Spacing, BorderRadius} from '@/constants/design-tokens';
 import {Ionicons} from '@expo/vector-icons';
 import * as Device from 'expo-device';
+import {userService} from '@/services/userService';
 
 export default function SettingsScreen() {
   const colorScheme = useColorScheme();
@@ -26,6 +27,35 @@ export default function SettingsScreen() {
 
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [deviceModalVisible, setDeviceModalVisible] = useState(false);
+  const [photoURL, setPhotoURL] = useState<string | undefined>(undefined);
+  const [isProfileLoaded, setIsProfileLoaded] = useState(false);
+
+  // 화면 포커스 시 프로필 로드 (다른 화면 갔다가 돌아올 때 업데이트된 사진 반영)
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.uid && !isProfileLoaded) {
+        loadUserProfile();
+      }
+    }, [user?.uid, isProfileLoaded]),
+  );
+
+  // 프로필 관리에서 돌아올 때 갱신
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.uid) {
+        loadUserProfile();
+      }
+    }, []),
+  );
+
+  const loadUserProfile = async () => {
+    if (!user?.uid) return;
+    const profile = await userService.getUserProfile(user.uid);
+    if (profile?.photoURL) {
+      setPhotoURL(profile.photoURL);
+    }
+    setIsProfileLoaded(true);
+  };
 
   const backgroundColor = isDark ? Colors.background.dark : Colors.background.light;
   const textColor = isDark ? Colors.text.primary.dark : Colors.text.primary.light;
@@ -69,7 +99,7 @@ export default function SettingsScreen() {
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
             <Image
-              source={require('@/assets/images/react-logo.png')} // Fallback or user image
+              source={photoURL ? {uri: photoURL} : require('@/assets/images/react-logo.png')}
               style={styles.avatar}
             />
             <TouchableOpacity style={styles.editIconContainer}>
