@@ -14,9 +14,15 @@ interface MemberListItemProps {
   member: Member;
   onFollowRequest: () => void;
   isDark: boolean;
+  showFollowButton?: boolean; // 팔로우 버튼 표시 여부
 }
 
-export default function MemberListItem({member, onFollowRequest, isDark}: MemberListItemProps) {
+export default function MemberListItem({
+  member,
+  onFollowRequest,
+  isDark,
+  showFollowButton = true,
+}: MemberListItemProps) {
   const [isFollowing, setIsFollowing] = useState(false);
 
   const cardBg = isDark ? Colors.background.paper.dark : Colors.background.paper.light;
@@ -41,21 +47,23 @@ export default function MemberListItem({member, onFollowRequest, isDark}: Member
         </Text>
       </View>
 
-      <TouchableOpacity
-        style={styles.followButton}
-        onPress={handleFollow}
-        disabled={isFollowing}
-        activeOpacity={0.7}>
-        <Text
-          style={[
-            styles.followButtonText,
-            {
-              color: isFollowing ? secondaryTextColor : Colors.primary[600],
-            },
-          ]}>
-          {isFollowing ? '요청됨' : '팔로우 요청'}
-        </Text>
-      </TouchableOpacity>
+      {showFollowButton && (
+        <TouchableOpacity
+          style={styles.followButton}
+          onPress={handleFollow}
+          disabled={isFollowing}
+          activeOpacity={0.7}>
+          <Text
+            style={[
+              styles.followButtonText,
+              {
+                color: isFollowing ? secondaryTextColor : Colors.primary[600],
+              },
+            ]}>
+            {isFollowing ? '요청됨' : '팔로우 요청'}
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }

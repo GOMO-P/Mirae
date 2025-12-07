@@ -5,8 +5,8 @@ import {useRouter, useNavigation, useLocalSearchParams} from 'expo-router';
 import Button from '@/components/ui/Button';
 import {Colors, Typography, Spacing, BorderRadius} from '@/constants/design-tokens';
 import {Ionicons} from '@expo/vector-icons';
-// ✅ Context Hook 추가
 import {useGroupContext} from '@/contexts/GroupContext';
+import {useAuthContext} from '@/contexts/AuthContext';
 
 const DAYS = [
   {id: 'mon', en: 'MO', kr: '월'},
@@ -23,10 +23,9 @@ export default function GroupApplicationScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
 
-  // ✅ 파라미터로 넘어온 그룹 ID 받기
   const {id} = useLocalSearchParams<{id: string}>();
-  // ✅ 가입 함수 가져오기
   const {joinGroup} = useGroupContext();
+  const {user} = useAuthContext();
 
   const [name, setName] = useState('');
   const [major, setMajor] = useState('');
@@ -46,24 +45,47 @@ export default function GroupApplicationScreen() {
     );
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name || !major || !intro) {
       Alert.alert('알림', '모든 정보를 입력해주세요.');
       return;
     }
 
+    if (!id) {
+      Alert.alert('오류', '그룹 정보를 찾을 수 없습니다.');
+      return;
+    }
+
+    if (!user) {
+      Alert.alert('로그인 필요', '지원서를 제출하려면 로그인이 필요합니다.');
+      return;
+    }
+
     setLoading(true);
 
-    setTimeout(() => {
-      // ✅ 실제 가입 처리 (id가 있을 경우)
-      if (id) {
-        joinGroup(id);
-      }
+    try {
+      const {addDoc, collection, serverTimestamp} = await import('firebase/firestore');
+      const {db} = await import('@/config/firebase');
+
+      await addDoc(collection(db, 'groupApplications'), {
+        groupId: id,
+        userId: user.uid,
+        name: name,
+        major: major,
+        intro: intro,
+        availableDays: selectedDays,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      });
 
       setLoading(false);
-      // 참가 완료 화면으로 이동
-      router.push('/join-complete');
-    }, 1000);
+      Alert.alert('제출 완료', '지원서가 제출되었습니다. 승인을 기다려주세요.');
+      router.back();
+    } catch (error) {
+      console.error('지원서 제출 실패:', error);
+      setLoading(false);
+      Alert.alert('오류', '지원서 제출에 실패했습니다.');
+    }
   };
 
   return (

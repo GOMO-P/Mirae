@@ -24,9 +24,22 @@ export const userService = {
 
       if (docSnap.exists()) {
         const data = docSnap.data();
+        
+        // 안전하게 문자열로 변환 (name 필드 하위 호환성)
+        const displayName = data.displayName 
+          ? String(data.displayName) 
+          : data.name 
+            ? String(data.name) 
+            : undefined;
+        
         return {
           uid: docSnap.id,
-          ...data,
+          email: data.email,
+          displayName: displayName,
+          bio: data.bio,
+          photoURL: data.photoURL,
+          followersCount: data.followersCount,
+          followingCount: data.followingCount,
           createdAt: data.createdAt?.toDate(),
           updatedAt: data.updatedAt?.toDate(),
         } as UserProfile;
@@ -160,6 +173,25 @@ export const userService = {
     } catch (error) {
       console.error('Error checking isFollowing:', error);
       return false;
+    }
+  },
+
+  // Get multiple user profiles by UIDs
+  async getUserProfiles(uids: string[]): Promise<UserProfile[]> {
+    try {
+      if (uids.length === 0) return [];
+
+      const profiles = await Promise.all(
+        uids.map(async uid => {
+          const profile = await this.getUserProfile(uid);
+          return profile;
+        }),
+      );
+
+      return profiles.filter((p): p is UserProfile => p !== null);
+    } catch (error) {
+      console.error('Error fetching user profiles:', error);
+      return [];
     }
   },
 };

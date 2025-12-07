@@ -1,4 +1,4 @@
-import React, {useState, useLayoutEffect, useMemo} from 'react';
+import React, {useState, useLayoutEffect, useMemo, useEffect} from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   useColorScheme,
   FlatList,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useRouter, useNavigation, useLocalSearchParams} from 'expo-router';
@@ -17,6 +18,8 @@ import {Ionicons} from '@expo/vector-icons';
 import MemberListItem from '@/components/ui/MemberListItem';
 import Avatar from '@/components/ui/Avatar';
 import {useGroupContext} from '@/contexts/GroupContext';
+import {useAuthContext} from '@/contexts/AuthContext';
+import {UserProfile} from '@/services/userService';
 
 // 📌 Fallback용 Mock Data (데이터를 못 찾았을 때 보여줄 기본값)
 const FALLBACK_GROUP = {
@@ -47,7 +50,8 @@ export default function GroupDetailScreen() {
 
   // URL 파라미터에서 id 받기
   const {id} = useLocalSearchParams<{id: string}>();
-  const {groups, joinedGroupIds} = useGroupContext();
+  const {groups, joinedGroupIds, getGroupMembers} = useGroupContext();
+  const {user} = useAuthContext();
 
   // ✅ 그룹 데이터 찾기 (없으면 Fallback 데이터 사용 - 오류 방지)
   const groupData = useMemo(() => {
@@ -58,14 +62,76 @@ export default function GroupDetailScreen() {
     return {...FALLBACK_GROUP, id: id || 'fallback'};
   }, [id, groups]);
 
-  // Fallback을 사용하는 경우 멤버 리스트가 없으므로 가짜 멤버 추가
-  const members = (groupData as any).members || FALLBACK_GROUP.members;
-
   // 이미 가입한 그룹인지 확인
   const isAlreadyJoined = joinedGroupIds.includes(groupData.id);
 
   const [isLiked, setIsLiked] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+  const [members, setMembers] = useState<UserProfile[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(true);
+  const [hasApplied, setHasApplied] = useState(false);
+  const [loadingApplicationStatus, setLoadingApplicationStatus] = useState(true);
+
+  // 실제 멤버 정보 가져오기
+  useEffect(() => {
+    const fetchMembers = async () => {
+      if (!id) return;
+
+      setLoadingMembers(true);
+      try {
+        const memberProfiles = await getGroupMembers(id);
+        setMembers(memberProfiles);
+      } catch (error) {
+        console.error('멤버 정보 로드 실패:', error);
+        // Fallback 데이터 사용
+        setMembers(FALLBACK_GROUP.members as any);
+      } finally {
+        setLoadingMembers(false);
+      }
+    };
+
+    fetchMembers();
+  }, [id, getGroupMembers]);
+
+  // 지원 상태 확인 (화면이 포커스될 때마다 체크)
+  useEffect(() => {
+    const checkApplicationStatus = async () => {
+      if (!id || !user) {
+        setLoadingApplicationStatus(false);
+        return;
+      }
+
+      setLoadingApplicationStatus(true);
+      try {
+        const {collection, query, where, getDocs} = await import('firebase/firestore');
+        const {db} = await import('@/config/firebase');
+
+        const q = query(
+          collection(db, 'groupApplications'),
+          where('groupId', '==', id),
+          where('userId', '==', user.uid),
+          where('status', '==', 'pending'),
+        );
+
+        const snapshot = await getDocs(q);
+        setHasApplied(!snapshot.empty);
+      } catch (error) {
+        console.error('지원 상태 확인 실패:', error);
+        setHasApplied(false);
+      } finally {
+        setLoadingApplicationStatus(false);
+      }
+    };
+
+    checkApplicationStatus();
+
+    // 화면이 포커스될 때마다 다시 체크
+    const unsubscribe = navigation.addListener('focus', () => {
+      checkApplicationStatus();
+    });
+
+    return unsubscribe;
+  }, [id, user, navigation]);
 
   const backgroundColor = isDark ? Colors.background.dark : '#E3F2FD';
   const textColor = isDark ? Colors.text.primary.dark : Colors.text.primary.light;
@@ -82,6 +148,10 @@ export default function GroupDetailScreen() {
       Alert.alert('알림', '이미 가입한 그룹입니다.');
       return;
     }
+    if (hasApplied) {
+      Alert.alert('알림', '이미 지원한 그룹입니다. 승인을 기다려주세요.');
+      return;
+    }
     // 지원서 화면으로 이동
     router.push({
       pathname: '/group-application',
@@ -93,13 +163,26 @@ export default function GroupDetailScreen() {
     console.log(`멤버 ${memberId}에게 팔로우 요청`);
   };
 
-  const renderMemberItem = ({item}: {item: any}) => (
-    <MemberListItem
-      member={item}
-      onFollowRequest={() => handleFollowRequest(item.id)}
-      isDark={isDark}
-    />
-  );
+  const renderMemberItem = ({item, index}: {item: UserProfile; index: number}) => {
+    // 첫 번째 멤버(생성자)를 방장으로 표시
+    const role = index === 0 ? '방장' : '팀원';
+    // 자신인지 확인
+    const isCurrentUser = user?.uid === item.uid;
+
+    return (
+      <MemberListItem
+        member={{
+          id: item.uid,
+          name: item.displayName || (item as any).name || item.email || '익명',
+          role: role as '방장' | '팀원',
+          imageUrl: item.photoURL,
+        }}
+        onFollowRequest={() => handleFollowRequest(item.uid)}
+        isDark={isDark}
+        showFollowButton={!isCurrentUser}
+      />
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor}]} edges={['top']}>
@@ -127,13 +210,28 @@ export default function GroupDetailScreen() {
         </View>
 
         {/* Member List Section */}
-        <FlatList
-          data={members}
-          renderItem={renderMemberItem}
-          keyExtractor={item => item.id}
-          scrollEnabled={false}
-          ItemSeparatorComponent={() => <View style={{height: Spacing.xs / 2}} />}
-        />
+        {loadingMembers ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={Colors.primary[600]} />
+            <Text style={[styles.loadingText, {color: secondaryTextColor}]}>
+              멤버 정보를 불러오는 중...
+            </Text>
+          </View>
+        ) : members.length > 0 ? (
+          <FlatList
+            data={members}
+            renderItem={renderMemberItem}
+            keyExtractor={item => item.uid}
+            scrollEnabled={false}
+            ItemSeparatorComponent={() => <View style={{height: Spacing.xs / 2}} />}
+          />
+        ) : (
+          <View style={styles.emptyMembersContainer}>
+            <Text style={[styles.emptyMembersText, {color: secondaryTextColor}]}>
+              아직 참여한 멤버가 없습니다
+            </Text>
+          </View>
+        )}
 
         <View style={styles.divider} />
 
@@ -141,7 +239,7 @@ export default function GroupDetailScreen() {
         <View style={styles.infoSection}>
           <Text style={[styles.groupName, {color: textColor}]}>{groupData.name}</Text>
           <Text style={[styles.groupStatus, {color: Colors.primary[600]}]}>
-            모집중 ({groupData.currentMembers}/{groupData.maxMembers})
+            모집중 ({members.length}/{groupData.maxMembers})
           </Text>
           <Text
             style={[
@@ -168,10 +266,16 @@ export default function GroupDetailScreen() {
           },
         ]}>
         <Button
-          title={isAlreadyJoined ? '이미 가입한 그룹입니다' : '그룹 참여하기'}
+          title={
+            isAlreadyJoined
+              ? '이미 가입한 그룹입니다'
+              : hasApplied
+              ? '지원한 그룹입니다'
+              : '그룹 참여하기'
+          }
           onPress={handleJoinGroup}
-          loading={isJoining}
-          disabled={isAlreadyJoined}
+          loading={isJoining || loadingApplicationStatus}
+          disabled={isAlreadyJoined || hasApplied}
           fullWidth
           size="md"
         />
@@ -228,5 +332,22 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.sm,
     borderTopWidth: 0.5,
     borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.lg,
+  },
+  loadingText: {
+    marginLeft: Spacing.sm,
+    fontSize: Typography.fontSize.sm,
+  },
+  emptyMembersContainer: {
+    paddingVertical: Spacing.lg,
+    alignItems: 'center',
+  },
+  emptyMembersText: {
+    fontSize: Typography.fontSize.base,
   },
 });

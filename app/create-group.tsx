@@ -1,8 +1,9 @@
 import React, {useState} from 'react';
-import {View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert} from 'react-native';
+import {View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image} from 'react-native';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useRouter, Stack} from 'expo-router';
 import {Ionicons} from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
@@ -69,6 +70,7 @@ export default function CreateGroupScreen() {
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [groupImage, setGroupImage] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
   const backgroundColor = isDark ? Colors.background.dark : Colors.background.light;
@@ -88,6 +90,27 @@ export default function CreateGroupScreen() {
     setGroupName('');
     setGroupDescription('');
     setSelectedCategories([]);
+    setGroupImage('');
+  };
+
+  const handlePickImage = async () => {
+    const {status} = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (status !== 'granted') {
+      Alert.alert('권한 필요', '사진을 선택하려면 갤러리 접근 권한이 필요합니다.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setGroupImage(result.assets[0].uri);
+    }
   };
 
   const handleCreateGroup = async () => {
@@ -106,7 +129,7 @@ export default function CreateGroupScreen() {
         categories: selectedCategories,
         maxMembers: 50,
         isMonthly: false,
-        imageUrl: '',
+        imageUrl: groupImage,
       });
 
       console.log('✅ 그룹 생성 완료, 화면 이동');
@@ -140,6 +163,21 @@ export default function CreateGroupScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* 그룹 이미지 선택 */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, {color: textColor}]}>그룹 이미지</Text>
+          <TouchableOpacity style={styles.imagePickerContainer} onPress={handlePickImage}>
+            {groupImage ? (
+              <Image source={{uri: groupImage}} style={styles.groupImage} />
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <Ionicons name="camera" size={40} color={Colors.neutral[400]} />
+                <Text style={styles.imagePlaceholderText}>이미지 선택</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
         <Input
           label="그룹 이름"
           placeholder="그룹 이름을 입력하세요"
@@ -287,5 +325,29 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.sm,
     borderTopWidth: 0.5,
     borderTopColor: Colors.neutral[300],
+  },
+  imagePickerContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    overflow: 'hidden',
+    alignSelf: 'center',
+    marginBottom: Spacing.md,
+  },
+  groupImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: Colors.neutral[200],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePlaceholderText: {
+    marginTop: Spacing.xs,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.neutral[500],
   },
 });
