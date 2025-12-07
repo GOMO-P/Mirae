@@ -4,6 +4,7 @@
     "strict": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
+    "jsx": "react-native",
     "paths": {
       "@/*": ["./*"]
     }

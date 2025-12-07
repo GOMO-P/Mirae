@@ -19,7 +19,7 @@ import MemberListItem from '@/components/ui/MemberListItem';
 import Avatar from '@/components/ui/Avatar';
 import {useGroupContext} from '@/contexts/GroupContext';
 import {useAuthContext} from '@/contexts/AuthContext';
-import {UserProfile} from '@/services/userService';
+import {UserProfile, userService} from '@/services/userService';
 
 // 📌 Fallback용 Mock Data (데이터를 못 찾았을 때 보여줄 기본값)
 const FALLBACK_GROUP = {
@@ -71,6 +71,8 @@ export default function GroupDetailScreen() {
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [hasApplied, setHasApplied] = useState(false);
   const [loadingApplicationStatus, setLoadingApplicationStatus] = useState(true);
+  const [followStates, setFollowStates] = useState<{[key: string]: boolean}>({});
+  const [followLoading, setFollowLoading] = useState<{[key: string]: boolean}>({});
 
   // 실제 멤버 정보 가져오기
   useEffect(() => {
@@ -81,6 +83,20 @@ export default function GroupDetailScreen() {
       try {
         const memberProfiles = await getGroupMembers(id);
         setMembers(memberProfiles);
+
+        // 팔로우 상태 확인
+        if (user?.uid && memberProfiles.length > 0) {
+          const followingList = await userService.getFollowing(user.uid);
+          const followingIds = new Set(followingList.map(u => u.uid));
+
+          const states: {[key: string]: boolean} = {};
+          memberProfiles.forEach(member => {
+            if (member.uid !== user.uid) {
+              states[member.uid] = followingIds.has(member.uid);
+            }
+          });
+          setFollowStates(states);
+        }
       } catch (error) {
         console.error('멤버 정보 로드 실패:', error);
         // Fallback 데이터 사용
@@ -91,7 +107,7 @@ export default function GroupDetailScreen() {
     };
 
     fetchMembers();
-  }, [id, getGroupMembers]);
+  }, [id, getGroupMembers, user?.uid]);
 
   // 지원 상태 확인 (화면이 포커스될 때마다 체크)
   useEffect(() => {
@@ -159,8 +175,37 @@ export default function GroupDetailScreen() {
     });
   };
 
-  const handleFollowRequest = (memberId: string) => {
-    console.log(`멤버 ${memberId}에게 팔로우 요청`);
+  const handleFollowRequest = async (memberId: string) => {
+    if (!user?.uid) {
+      Alert.alert('알림', '로그인이 필요합니다.');
+      return;
+    }
+
+    if (user.uid === memberId) {
+      return; // 자신은 팔로우 불가
+    }
+
+    // 로딩 상태 설정
+    setFollowLoading(prev => ({...prev, [memberId]: true}));
+
+    try {
+      const isCurrentlyFollowing = followStates[memberId];
+
+      if (isCurrentlyFollowing) {
+        await userService.unfollowUser(user.uid, memberId);
+        setFollowStates(prev => ({...prev, [memberId]: false}));
+        Alert.alert('알림', '언팔로우 했습니다.');
+      } else {
+        await userService.followUser(user.uid, memberId);
+        setFollowStates(prev => ({...prev, [memberId]: true}));
+        Alert.alert('알림', '팔로우 했습니다.');
+      }
+    } catch (error) {
+      console.error('팔로우 처리 실패:', error);
+      Alert.alert('오류', '팔로우 처리 중 오류가 발생했습니다.');
+    } finally {
+      setFollowLoading(prev => ({...prev, [memberId]: false}));
+    }
   };
 
   const renderMemberItem = ({item, index}: {item: UserProfile; index: number}) => {
@@ -180,6 +225,8 @@ export default function GroupDetailScreen() {
         onFollowRequest={() => handleFollowRequest(item.uid)}
         isDark={isDark}
         showFollowButton={!isCurrentUser}
+        isFollowing={followStates[item.uid] || false}
+        isLoading={followLoading[item.uid] || false}
       />
     );
   };

@@ -65,6 +65,11 @@ function RootLayoutNav() {
         <Stack.Screen name="notifications" options={{headerShown: false}} />
         <Stack.Screen name="privacy" options={{headerShown: false}} />
         <Stack.Screen name="language" options={{headerShown: false}} />
+
+        {/* ✅ 프로필 관련 화면들 */}
+        <Stack.Screen name="user-profile" options={{headerShown: false}} />
+        <Stack.Screen name="followers-list" options={{headerShown: false}} />
+        <Stack.Screen name="following-list" options={{headerShown: false}} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

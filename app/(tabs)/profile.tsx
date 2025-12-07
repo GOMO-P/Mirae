@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,12 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useAuthContext} from '@/contexts/AuthContext';
-import {useRouter} from 'expo-router';
+import {useRouter, usePathname} from 'expo-router';
 import useAuth from '@/hooks/useAuth';
 import {Colors, Typography, Spacing, BorderRadius} from '@/constants/design-tokens';
 import {Ionicons} from '@expo/vector-icons';
 import * as Device from 'expo-device';
+import {userService} from '@/services/userService';
 
 export default function SettingsScreen() {
   const colorScheme = useColorScheme();
@@ -23,9 +24,26 @@ export default function SettingsScreen() {
   const {user} = useAuthContext();
   const {logout} = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [deviceModalVisible, setDeviceModalVisible] = useState(false);
+  const [photoURL, setPhotoURL] = useState<string | undefined>(undefined);
+
+  // 화면 진입 시 및 다른 화면에서 돌아올 때 프로필 로드
+  useEffect(() => {
+    if (user?.uid && pathname === '/profile') {
+      loadUserProfile();
+    }
+  }, [user?.uid, pathname]);
+
+  const loadUserProfile = async () => {
+    if (!user?.uid) return;
+    const profile = await userService.getUserProfile(user.uid);
+    if (profile?.photoURL) {
+      setPhotoURL(profile.photoURL);
+    }
+  };
 
   const backgroundColor = isDark ? Colors.background.dark : Colors.background.light;
   const textColor = isDark ? Colors.text.primary.dark : Colors.text.primary.light;
@@ -69,7 +87,7 @@ export default function SettingsScreen() {
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
             <Image
-              source={require('@/assets/images/react-logo.png')} // Fallback or user image
+              source={photoURL ? {uri: photoURL} : require('@/assets/images/react-logo.png')}
               style={styles.avatar}
             />
             <TouchableOpacity style={styles.editIconContainer}>

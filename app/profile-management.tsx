@@ -15,6 +15,7 @@ import {useAuthContext} from '@/contexts/AuthContext';
 import {Colors, Typography, Spacing, BorderRadius} from '@/constants/design-tokens';
 import {Ionicons} from '@expo/vector-icons';
 import {userService} from '@/services/userService';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function ProfileManagementScreen() {
   const colorScheme = useColorScheme();
@@ -27,6 +28,7 @@ export default function ProfileManagementScreen() {
   const [followingCount, setFollowingCount] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [photoURL, setPhotoURL] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (user?.uid) {
@@ -41,6 +43,7 @@ export default function ProfileManagementScreen() {
       setBio(profile.bio || '');
       setFollowersCount(profile.followersCount || 0);
       setFollowingCount(profile.followingCount || 0);
+      setPhotoURL(profile.photoURL);
     }
   };
 
@@ -57,6 +60,34 @@ export default function ProfileManagementScreen() {
     } catch (error) {
       console.error('Failed to save profile:', error);
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePickImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (permissionResult.granted === false) {
+        alert('사진 라이브러리 접근 권한이 필요합니다.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0] && user?.uid) {
+        setLoading(true);
+        const downloadURL = await userService.uploadProfilePhoto(user.uid, result.assets[0].uri);
+        setPhotoURL(downloadURL);
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
       setLoading(false);
     }
   };
@@ -86,12 +117,15 @@ export default function ProfileManagementScreen() {
 
         {/* Profile Info */}
         <View style={styles.profileInfo}>
-          <View style={styles.avatarContainer}>
+          <TouchableOpacity onPress={handlePickImage} style={styles.avatarContainer}>
             <Image
-              source={require('@/assets/images/react-logo.png')} // Fallback or user image
+              source={photoURL ? {uri: photoURL} : require('@/assets/images/react-logo.png')}
               style={styles.avatar}
             />
-          </View>
+            <View style={styles.cameraIconContainer}>
+              <Ionicons name="camera" size={20} color="white" />
+            </View>
+          </TouchableOpacity>
           <View style={styles.textInfo}>
             <Text style={[styles.userName, {color: textColor}]}>닉네임 : {userName}</Text>
             <Text style={[styles.userTag, {color: secondaryTextColor}]}>Tag : @{userTag}</Text>
@@ -100,14 +134,14 @@ export default function ProfileManagementScreen() {
 
         {/* Stats */}
         <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
+          <TouchableOpacity style={styles.statItem} onPress={() => router.push('/followers-list')}>
             <Text style={[styles.statLabel, {color: textColor}]}>팔로워</Text>
             <Text style={[styles.statValue, {color: secondaryTextColor}]}>{followersCount}</Text>
-          </View>
-          <View style={styles.statItem}>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.statItem} onPress={() => router.push('/following-list')}>
             <Text style={[styles.statLabel, {color: textColor}]}>팔로잉</Text>
             <Text style={[styles.statValue, {color: secondaryTextColor}]}>{followingCount}</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Bio */}
@@ -188,6 +222,17 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     backgroundColor: '#bfdbfe', // Light blue placeholder
+  },
+  cameraIconContainer: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: Colors.primary[500],
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   textInfo: {
     justifyContent: 'center',
