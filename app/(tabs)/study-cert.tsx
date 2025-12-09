@@ -1,6 +1,4 @@
-// app/study-cert.tsx
-
-import React, { useState } from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -10,14 +8,27 @@ import {
   Alert,
   ScrollView,
   Image,
+  Modal,
+  FlatList,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { db, storage } from '../../config/firebase';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {router, useLocalSearchParams} from 'expo-router';
+import {
+  addDoc,
+  collection,
+  serverTimestamp,
+  doc,
+  writeBatch,
+  increment,
+  runTransaction,
+} from 'firebase/firestore';
+import {db, storage} from '../../config/firebase';
 
 import * as ImagePicker from 'expo-image-picker';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import {ref, uploadBytes, getDownloadURL} from 'firebase/storage';
+
+import {useAuthContext} from '@/contexts/AuthContext';
+import {useGroupContext} from '@/contexts/GroupContext';
 
 const BLUE = '#4A90E2';
 const LIGHT_BG = '#F5F7FA';
@@ -30,13 +41,24 @@ const TEXT_DARK = '#1C1C1E';
 const weekdayKo = ['일', '월', '화', '수', '목', '금', '토'];
 
 export default function StudyCertScreen() {
-  const [studyMode, setStudyMode] = useState<'solo' | 'group'>('solo');
+  const {user} = useAuthContext();
+  const {getMyGroups} = useGroupContext();
+  const myGroups = getMyGroups();
+
+  const params = useLocalSearchParams();
+  const [studyMode, setStudyMode] = useState<'solo' | 'group'>(
+    params.mode === 'group' || params.mode === 'solo' ? params.mode : 'solo',
+  );
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [hours, setHours] = useState(1);
   const [minutes, setMinutes] = useState(0);
   const [description, setDescription] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // 그룹 선택 관련 state
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [groupModalVisible, setGroupModalVisible] = useState(false);
 
   // ===== 날짜 조절 =====
   const changeMonth = (delta: number) => {
@@ -62,8 +84,7 @@ export default function StudyCertScreen() {
 
   // ===== 사진 선택 =====
   const pickImage = async () => {
-    const { status } =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const {status} = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (status !== 'granted') {
       Alert.alert('권한 필요', '앨범 접근 권한을 허용해주세요.');
@@ -104,12 +125,23 @@ export default function StudyCertScreen() {
 
   // ===== 등록 처리 =====
   const handleSubmit = async () => {
+    if (!user) {
+      Alert.alert('오류', '로그인이 필요합니다.');
+      return;
+    }
+
     if (!description.trim()) {
       Alert.alert('안내', '오늘 공부한 내용을 적어주세요.');
       return;
     }
-    if (hours === 0 && minutes === 0) {
+    const totalMinutes = hours * 60 + minutes;
+    if (totalMinutes < 1) {
       Alert.alert('안내', '공부한 시간을 1분 이상으로 설정해주세요.');
+      return;
+    }
+
+    if (studyMode === 'group' && !selectedGroupId) {
+      Alert.alert('안내', '공부한 그룹을 선택해주세요.');
       return;
     }
 
@@ -121,42 +153,75 @@ export default function StudyCertScreen() {
       // --- 사진 업로드 (있을 때만) ---
       if (imageUri) {
         try {
-          console.log('이미지 업로드 시작', imageUri);
+          // fetch 대신 XMLHttpRequest 사용 (React Native Blob 이슈 해결)
+          const blob: any = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.onload = function () {
+              resolve(xhr.response);
+            };
+            xhr.onerror = function (e) {
+              console.error(e);
+              reject(new TypeError('Network request failed'));
+            };
+            xhr.responseType = 'blob';
+            xhr.open('GET', imageUri, true);
+            xhr.send(null);
+          });
 
-          // 웹/모바일 공통: URI -> blob
-          const response = await fetch(imageUri);
-          const blob = await response.blob();
-
-          const fileRef = ref(
-            storage,
-            `studyCerts/defaultUser/${Date.now()}.jpg`,
-          );
+          const fileRef = ref(storage, `studyCerts/${user.uid}/${Date.now()}.jpg`);
 
           await uploadBytes(fileRef, blob);
           imageUrl = await getDownloadURL(fileRef);
 
-          console.log('이미지 업로드 완료', imageUrl);
+          // Blob 해제 (메모리 누수 방지, 필요한 경우)
+          // if (blob.close) blob.close();
         } catch (err) {
           console.error('이미지 업로드 에러:', err);
-          Alert.alert(
-            '사진 업로드 실패',
-            '사진은 업로드하지 못했지만,\n인증 내용만 저장할게요.',
-          );
-          // imageUrl은 null 그대로 유지 → 텍스트만 저장
+          Alert.alert('사진 업로드 실패', '사진은 업로드하지 못했지만,\n인증 내용만 저장할게요.');
         }
       }
 
-      // --- Firestore에 인증 기록 저장 ---
-      await addDoc(collection(db, 'studyRecords'), {
-        studyMode, // 'solo' | 'group'
-        studyDate: selectedDate.toISOString(),
-        studyDateDisplay: `${year}년 ${month}월 ${day}일 (${weekday})`,
-        hours,
-        minutes,
-        totalMinutes: hours * 60 + minutes,
-        description,
-        imageUrl: imageUrl ?? null,
-        createdAt: serverTimestamp(),
+      // --- Firestore Transaction: 기록 저장 + 포인트 지급 ---
+      const points = totalMinutes; // 1분당 1포인트
+
+      const selectedGroup = myGroups.find(g => g.id === selectedGroupId);
+      const selectedGroupName = selectedGroup ? selectedGroup.name : null;
+
+      await runTransaction(db, async transaction => {
+        // 1. Study Record 생성
+        const newRecordRef = doc(collection(db, 'studyRecords'));
+        transaction.set(newRecordRef, {
+          uid: user.uid,
+          userDisplayName: user.displayName || '익명',
+          userPhotoURL: user.photoURL || null,
+          studyMode, // 'solo' | 'group'
+          groupId: studyMode === 'group' ? selectedGroupId : null,
+          groupName: studyMode === 'group' ? selectedGroupName : null,
+          studyDate: selectedDate.toISOString(),
+          studyDateDisplay: `${year}년 ${month}월 ${day}일 (${weekday})`,
+          hours,
+          minutes,
+          totalMinutes,
+          description,
+          imageUrl: imageUrl ?? null,
+          createdAt: serverTimestamp(),
+          pointsEarned: points,
+        });
+
+        // 2. 개인 포인트 지급
+        const userRef = doc(db, 'users', user.uid);
+        transaction.update(userRef, {
+          totalPoints: increment(points),
+          totalStudyMinutes: increment(totalMinutes),
+        });
+
+        // 3. 그룹 포인트 지급 (그룹 모드인 경우)
+        if (studyMode === 'group' && selectedGroupId) {
+          const groupRef = doc(db, 'groups', selectedGroupId);
+          transaction.update(groupRef, {
+            totalPoints: increment(points),
+          });
+        }
       });
 
       // 폼 초기화
@@ -165,16 +230,23 @@ export default function StudyCertScreen() {
       setHours(1);
       setMinutes(0);
       setSelectedDate(new Date());
+      setSelectedGroupId(null);
 
-      // 피드 화면으로 이동
-      router.push('/study-feed');
+      Alert.alert('성공', `${points} 포인트를 획득했어요! 👏`);
+      if (params.returnFilter) {
+        router.replace(`/study-feed?initialFilter=${params.returnFilter}`);
+      } else {
+        router.replace('/study-feed');
+      }
     } catch (e) {
       console.error('인증 등록 전체 에러:', e);
-      Alert.alert('에러', '저장 중 오류가 발생했어요.');
+      Alert.alert('에러', '저장 중 오류가 발생했습니다.');
     } finally {
       setSubmitting(false);
     }
   };
+
+  const selectedGroupName = myGroups.find(g => g.id === selectedGroupId)?.name || '선택하기';
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -195,17 +267,13 @@ export default function StudyCertScreen() {
               <TouchableOpacity
                 style={[
                   styles.toggle,
-                  studyMode === 'solo'
-                    ? styles.toggleActive
-                    : styles.toggleInactive,
+                  studyMode === 'solo' ? styles.toggleActive : styles.toggleInactive,
                 ]}
                 onPress={() => setStudyMode('solo')}>
                 <Text
                   style={[
                     styles.toggleText,
-                    studyMode === 'solo'
-                      ? styles.toggleTextActive
-                      : styles.toggleTextInactive,
+                    studyMode === 'solo' ? styles.toggleTextActive : styles.toggleTextInactive,
                   ]}>
                   혼자 공부
                 </Text>
@@ -214,22 +282,29 @@ export default function StudyCertScreen() {
               <TouchableOpacity
                 style={[
                   styles.toggle,
-                  studyMode === 'group'
-                    ? styles.toggleActive
-                    : styles.toggleInactive,
+                  studyMode === 'group' ? styles.toggleActive : styles.toggleInactive,
                 ]}
                 onPress={() => setStudyMode('group')}>
                 <Text
                   style={[
                     styles.toggleText,
-                    studyMode === 'group'
-                      ? styles.toggleTextActive
-                      : styles.toggleTextInactive,
+                    studyMode === 'group' ? styles.toggleTextActive : styles.toggleTextInactive,
                   ]}>
                   다같이 공부
                 </Text>
               </TouchableOpacity>
             </View>
+
+            {/* 그룹 선택 버튼 (그룹 모드일 때만 표시) */}
+            {studyMode === 'group' && (
+              <TouchableOpacity
+                style={styles.groupSelectButton}
+                onPress={() => setGroupModalVisible(true)}>
+                <Text style={styles.groupSelectLabel}>공부한 그룹 선택:</Text>
+                <Text style={styles.groupSelectValue}>{selectedGroupName}</Text>
+                <Text style={styles.chevron}>{'>'}</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* 2. 날짜 선택 */}
@@ -241,17 +316,11 @@ export default function StudyCertScreen() {
               <View style={styles.dateBlock}>
                 <Text style={styles.dateBlockLabel}>MONTH</Text>
                 <View style={styles.dateControlRow}>
-                  <TouchableOpacity
-                    style={styles.dateBtn}
-                    onPress={() => changeMonth(-1)}>
+                  <TouchableOpacity style={styles.dateBtn} onPress={() => changeMonth(-1)}>
                     <Text style={styles.dateBtnText}>-</Text>
                   </TouchableOpacity>
-                  <Text style={styles.dateValue}>
-                    {String(month).padStart(2, '0')}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.dateBtn}
-                    onPress={() => changeMonth(1)}>
+                  <Text style={styles.dateValue}>{String(month).padStart(2, '0')}</Text>
+                  <TouchableOpacity style={styles.dateBtn} onPress={() => changeMonth(1)}>
                     <Text style={styles.dateBtnText}>+</Text>
                   </TouchableOpacity>
                 </View>
@@ -261,17 +330,11 @@ export default function StudyCertScreen() {
               <View style={styles.dateBlock}>
                 <Text style={styles.dateBlockLabel}>DAY</Text>
                 <View style={styles.dateControlRow}>
-                  <TouchableOpacity
-                    style={styles.dateBtn}
-                    onPress={() => changeDay(-1)}>
+                  <TouchableOpacity style={styles.dateBtn} onPress={() => changeDay(-1)}>
                     <Text style={styles.dateBtnText}>-</Text>
                   </TouchableOpacity>
-                  <Text style={styles.dateValue}>
-                    {String(day).padStart(2, '0')}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.dateBtn}
-                    onPress={() => changeDay(1)}>
+                  <Text style={styles.dateValue}>{String(day).padStart(2, '0')}</Text>
+                  <TouchableOpacity style={styles.dateBtn} onPress={() => changeDay(1)}>
                     <Text style={styles.dateBtnText}>+</Text>
                   </TouchableOpacity>
                 </View>
@@ -280,9 +343,7 @@ export default function StudyCertScreen() {
               {/* 요일 표시 */}
               <View style={styles.dateBlockSmall}>
                 <Text style={styles.dateBlockLabel}>WEEKDAY</Text>
-                <Text style={[styles.dateValue, { marginTop: 8 }]}>
-                  {weekday}
-                </Text>
+                <Text style={[styles.dateValue, {marginTop: 8}]}>{weekday}</Text>
               </View>
             </View>
 
@@ -293,27 +354,17 @@ export default function StudyCertScreen() {
 
           {/* 3. 사진 + 시간 */}
           <View style={styles.section}>
-            <Text style={styles.subLabel}>
-              공부한 사진과 시간을 알려주세요!
-            </Text>
+            <Text style={styles.subLabel}>공부한 사진과 시간을 알려주세요!</Text>
 
             <View style={styles.timeRow}>
               {/* 사진 박스 */}
-              <TouchableOpacity
-                style={styles.photoBox}
-                onPress={pickImage}
-                activeOpacity={0.8}>
+              <TouchableOpacity style={styles.photoBox} onPress={pickImage} activeOpacity={0.8}>
                 {imageUri ? (
-                  <Image
-                    source={{ uri: imageUri }}
-                    style={styles.photoImage}
-                  />
+                  <Image source={{uri: imageUri}} style={styles.photoImage} />
                 ) : (
                   <>
                     <Text style={styles.photoIcon}>🖼</Text>
-                    <Text style={styles.photoText}>
-                      사진 선택하기{'\n'}(한 번 터치해서 선택)
-                    </Text>
+                    <Text style={styles.photoText}>사진 선택하기{'\n'}(한 번 터치해서 선택)</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -323,17 +374,11 @@ export default function StudyCertScreen() {
                 <View style={styles.timeBadge}>
                   <Text style={styles.timeTitle}>HOURS</Text>
                   <View style={styles.timeControlRow}>
-                    <TouchableOpacity
-                      style={styles.timeButton}
-                      onPress={() => changeHours(-1)}>
+                    <TouchableOpacity style={styles.timeButton} onPress={() => changeHours(-1)}>
                       <Text style={styles.timeButtonText}>-</Text>
                     </TouchableOpacity>
-                    <Text style={styles.timeValue}>
-                      {String(hours).padStart(2, '0')}
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.timeButton}
-                      onPress={() => changeHours(1)}>
+                    <Text style={styles.timeValue}>{String(hours).padStart(2, '0')}</Text>
+                    <TouchableOpacity style={styles.timeButton} onPress={() => changeHours(1)}>
                       <Text style={styles.timeButtonText}>+</Text>
                     </TouchableOpacity>
                   </View>
@@ -342,17 +387,11 @@ export default function StudyCertScreen() {
                 <View style={styles.timeBadge}>
                   <Text style={styles.timeTitle}>MINUTES</Text>
                   <View style={styles.timeControlRow}>
-                    <TouchableOpacity
-                      style={styles.timeButton}
-                      onPress={() => changeMinutes(-5)}>
+                    <TouchableOpacity style={styles.timeButton} onPress={() => changeMinutes(-5)}>
                       <Text style={styles.timeButtonText}>-</Text>
                     </TouchableOpacity>
-                    <Text style={styles.timeValue}>
-                      {String(minutes).padStart(2, '0')}
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.timeButton}
-                      onPress={() => changeMinutes(5)}>
+                    <Text style={styles.timeValue}>{String(minutes).padStart(2, '0')}</Text>
+                    <TouchableOpacity style={styles.timeButton} onPress={() => changeMinutes(5)}>
                       <Text style={styles.timeButtonText}>+</Text>
                     </TouchableOpacity>
                   </View>
@@ -363,9 +402,7 @@ export default function StudyCertScreen() {
 
           {/* 4. 설명 입력 */}
           <View style={styles.section}>
-            <Text style={styles.subLabel}>
-              오늘 공부한 내용에 대해 설명해주세요...
-            </Text>
+            <Text style={styles.subLabel}>오늘 공부한 내용에 대해 설명해주세요...</Text>
             <TextInput
               style={styles.textArea}
               multiline
@@ -378,18 +415,61 @@ export default function StudyCertScreen() {
 
           {/* 5. 인증 등록 버튼 */}
           <TouchableOpacity
-            style={[
-              styles.submitButton,
-              submitting && { opacity: 0.6 },
-            ]}
+            style={[styles.submitButton, submitting && {opacity: 0.6}]}
             onPress={handleSubmit}
             disabled={submitting}>
-            <Text style={styles.submitText}>
-              {submitting ? '등록 중...' : '인증 등록하기'}
-            </Text>
+            <Text style={styles.submitText}>{submitting ? '등록 중...' : '인증 등록하기'}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* 그룹 선택 모달 */}
+      <Modal
+        visible={groupModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setGroupModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>공부한 그룹을 선택해주세요</Text>
+            {myGroups.length === 0 ? (
+              <View style={styles.emptyGroupView}>
+                <Text style={styles.emptyGroupText}>가입된 그룹이 없어요.</Text>
+                <Text style={styles.emptyGroupText}>먼저 그룹에 가입해보세요!</Text>
+                <TouchableOpacity
+                  style={[styles.modalButton, {marginTop: 20}]}
+                  onPress={() => setGroupModalVisible(false)}>
+                  <Text style={styles.modalButtonText}>닫기</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <FlatList
+                data={myGroups}
+                keyExtractor={item => item.id}
+                renderItem={({item}) => (
+                  <TouchableOpacity
+                    style={styles.modalGroupItem}
+                    onPress={() => {
+                      setSelectedGroupId(item.id);
+                      setGroupModalVisible(false);
+                    }}>
+                    <Text style={styles.modalGroupText}>{item.name}</Text>
+                    {selectedGroupId === item.id && <Text style={{color: BLUE}}>✓</Text>}
+                  </TouchableOpacity>
+                )}
+                style={{maxHeight: 300, width: '100%'}}
+              />
+            )}
+            {myGroups.length > 0 && (
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setGroupModalVisible(false)}>
+                <Text style={styles.modalCancelText}>취소</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -424,7 +504,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
@@ -471,6 +551,31 @@ const styles = StyleSheet.create({
   },
   toggleTextInactive: {
     color: GRAY,
+  },
+  groupSelectButton: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F4FF',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D0D8FF',
+  },
+  groupSelectLabel: {
+    fontSize: 13,
+    color: '#555',
+    marginRight: 8,
+  },
+  groupSelectValue: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: BLUE,
+  },
+  chevron: {
+    fontSize: 16,
+    color: BLUE,
   },
   dateRow: {
     flexDirection: 'row',
@@ -624,5 +729,61 @@ const styles = StyleSheet.create({
     color: WHITE,
     fontWeight: '700',
     fontSize: 15,
+  },
+  // 모달 스타일
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    maxHeight: '60%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  modalGroupItem: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalGroupText: {
+    fontSize: 16,
+  },
+  modalCancelButton: {
+    marginTop: 16,
+    alignItems: 'center',
+    padding: 12,
+  },
+  modalCancelText: {
+    color: '#666',
+    fontSize: 16,
+  },
+  modalButton: {
+    backgroundColor: BLUE,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  emptyGroupView: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyGroupText: {
+    color: '#666',
+    fontSize: 14,
+    marginBottom: 4,
   },
 });
