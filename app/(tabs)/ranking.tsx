@@ -111,13 +111,6 @@ export default function RankingScreen() {
               (위 코드에서는 헤더 Title에 잠시 넣었으나, 좀 더 정확히 탭 옆에 넣어봄)
           */}
 
-        {/* 날짜 영역 */}
-        <View style={styles.dateRow}>
-          <Text style={styles.arrow}>{'<'}</Text>
-          <Text style={styles.dateText}>이번 주 누적 랭킹</Text>
-          <Text style={styles.arrow}>{'>'}</Text>
-        </View>
-
         {/* 리스트 */}
         {loading ? (
           <View style={styles.loadingContainer}>

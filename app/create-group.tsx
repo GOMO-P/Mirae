@@ -119,7 +119,7 @@ export default function CreateGroupScreen() {
 
   const handlePickImage = async () => {
     const {status} = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
+
     if (status !== 'granted') {
       Alert.alert('권한 필요', '사진을 선택하려면 갤러리 접근 권한이 필요합니다.');
       return;
@@ -245,18 +245,7 @@ export default function CreateGroupScreen() {
                 onPress={() => handleToggleCategory(category)}
               />
             ))}
-            <TouchableOpacity style={styles.plusButton}>
-              <Ionicons name="add" size={20} color={isDark ? '#FFF' : '#333'} />
-            </TouchableOpacity>
           </View>
-        </View>
-
-        <View style={styles.section}>
-          <Collapsible title="고급 설정">
-            <Text style={[styles.collapsibleContent, {color: isDark ? '#999' : '#666'}]}>
-              프라이빗 설정, 최대 인원수, 가입 승인 방식 등을 설정하는 영역입니다. (추후 구현)
-            </Text>
-          </Collapsible>
         </View>
 
         <View style={{height: Spacing.xl}} />
