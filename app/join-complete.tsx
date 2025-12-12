@@ -6,11 +6,16 @@ import Button from '@/components/ui/Button';
 import GroupListItem from '@/components/ui/GroupListItem';
 import {Colors, Typography, Spacing, BorderRadius} from '@/constants/design-tokens';
 import {Ionicons} from '@expo/vector-icons';
+import {useGroupContext} from '@/contexts/GroupContext';
 
 export default function JoinCompleteScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  
+  // 실제 그룹 데이터에서 추천 그룹 가져오기
+  const {getPopularGroups} = useGroupContext();
+  const recommendedGroups = getPopularGroups().slice(0, 3); // 인기 그룹 중 상위 3개
 
   // 헤더 숨김
   useLayoutEffect(() => {
@@ -65,23 +70,31 @@ export default function JoinCompleteScreen() {
 
         {/* Success Message */}
         <View style={styles.messageContainer}>
-          <Text style={styles.mainMessage}>정상적으로 스터디 지원이 완료되었어요 ✅</Text>
-          <Text style={styles.subMessage}>스터디 가입 완료되었어요!</Text>
+          <Text style={styles.mainMessage}>그룹 생성이 완료되었어요 ✅</Text>
+          <Text style={styles.subMessage}>새로운 그룹이 성공적으로 만들어졌습니다!</Text>
         </View>
 
         {/* Recommendation Section */}
-        <View style={styles.recommendationSection}>
-          <Text style={styles.recommendationTitle}>이런 스터디 그룹은 어떠세요?</Text>
+        {recommendedGroups.length > 0 && (
+          <View style={styles.recommendationSection}>
+            <Text style={styles.recommendationTitle}>이런 스터디 그룹은 어떠세요?</Text>
 
-          {RECOMMENDED_GROUPS.map(group => (
-            <GroupListItem
-              key={group.id}
-              group={group}
-              onPress={() => {}} // 추천 그룹 클릭 시 동작 (필요 시 구현)
-              isDark={false} // 배경이 흰색이므로 라이트 모드 스타일 적용
-            />
-          ))}
-        </View>
+            {recommendedGroups.map(group => (
+              <GroupListItem
+                key={group.id}
+                group={group}
+                onPress={() => {
+                  // 추천 그룹 클릭 시 그룹 상세 페이지로 이동
+                  router.push({
+                    pathname: '/group-detail',
+                    params: {id: group.id},
+                  });
+                }}
+                isDark={false} // 배경이 흰색이므로 라이트 모드 스타일 적용
+              />
+            ))}
+          </View>
+        )}
 
         <View style={{height: 40}} />
       </ScrollView>

@@ -165,13 +165,10 @@ export default function CreateGroupScreen() {
         imageUrl: imageUrl,
       });
 
-      console.log('✅ 그룹 생성 완료, 화면 이동');
+      console.log('✅ 그룹 생성 완료, 가입 완료 화면으로 이동');
 
-      // Alert는 addGroup 내부에서 이미 표시되므로 제거
-      if (router.canDismiss()) {
-        router.dismissAll();
-      }
-      router.replace('/(tabs)');
+      // 가입 완료 화면으로 이동
+      router.push('/join-complete');
     } catch (e) {
       console.error('❌ handleCreateGroup 에러:', e);
       Alert.alert('오류', '그룹 생성 중 오류가 발생했습니다.');
