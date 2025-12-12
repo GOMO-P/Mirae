@@ -1,6 +1,4 @@
-// app/study-feed.tsx
-
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -12,202 +10,265 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {router, useLocalSearchParams} from 'expo-router';
 
 import {
   collection,
   query,
   orderBy,
   onSnapshot,
-  deleteDoc,
   doc,
+  where,
+  runTransaction,
+  increment,
 } from 'firebase/firestore';
-import { db, storage } from '../../config/firebase';
-import { ref, deleteObject } from 'firebase/storage';
+import {db, storage} from '../../config/firebase';
+import {ref, deleteObject} from 'firebase/storage';
+import {useAuthContext} from '@/contexts/AuthContext';
+import {useGroupContext} from '@/contexts/GroupContext';
 
 const BLUE = '#4A90E2';
 const LIGHT_BG = '#F5F7FA';
 const LIGHT_CARD = '#FFFFFF';
 const GRAY = '#8E8E93';
-const LIGHT_GRAY = '#E5E5EA';
-const WHITE = '#FFFFFF';
 const TEXT_DARK = '#1C1C1E';
+const WHITE = '#FFFFFF';
 
 type StudyRecord = {
   id: string;
+  uid?: string;
+  userDisplayName?: string;
+  userPhotoURL?: string;
   studyMode: 'solo' | 'group';
+  groupId?: string;
+  groupName?: string;
   studyDateDisplay: string;
   hours: number;
   minutes: number;
   totalMinutes: number;
+  pointsEarned?: number;
   description: string;
   imageUrl: string | null;
   createdAt?: any;
 };
 
 export default function StudyFeedScreen() {
+  const {user} = useAuthContext();
+  const {joinedGroupIds} = useGroupContext();
+  const params = useLocalSearchParams();
+
   const [records, setRecords] = useState<StudyRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [filterMode, setFilterMode] = useState<'all' | 'group' | 'my'>('all');
+
+  // 파라미터로 필터 모드 변경
+  useEffect(() => {
+    if (params.initialFilter) {
+      setFilterMode(params.initialFilter as any);
+    }
+  }, [params.initialFilter]);
 
   // ===== Firestore 실시간 구독 =====
   useEffect(() => {
-    const q = query(
-      collection(db, 'studyRecords'),
-      orderBy('createdAt', 'desc'),
-    );
+    setLoading(true);
+    setRecords([]); // 필터 변경 시 기존 데이터 초기화
+    let q;
+
+    if (filterMode === 'my' && user) {
+      q = query(
+        collection(db, 'studyRecords'),
+        where('uid', '==', user.uid),
+        orderBy('createdAt', 'desc'),
+      );
+    } else if (filterMode === 'group') {
+      if (!joinedGroupIds || joinedGroupIds.length === 0) {
+        // 가입한 그룹이 없으면 빈 목록
+        setRecords([]);
+        setLoading(false);
+        return;
+      }
+      // 'in' 쿼리는 최대 10개(또는 30개) 제안이 있음. 안전하게 10개로 자르거나 처리 필요.
+      const targetGroups = joinedGroupIds.slice(0, 10);
+      q = query(
+        collection(db, 'studyRecords'),
+        where('groupId', 'in', targetGroups),
+        orderBy('createdAt', 'desc'),
+      );
+    } else {
+      // 전체 피드
+      q = query(collection(db, 'studyRecords'), orderBy('createdAt', 'desc'));
+    }
 
     const unsub = onSnapshot(
       q,
-      (snap: any) => {
-        const list: StudyRecord[] = snap.docs.map((d: any) => ({
+      snap => {
+        const list: StudyRecord[] = snap.docs.map(d => ({
           id: d.id,
           ...(d.data() as any),
         }));
         setRecords(list);
         setLoading(false);
       },
-      (err: any) => {
+      err => {
         console.error('피드 구독 에러:', err);
         setLoading(false);
       },
     );
 
     return () => unsub();
-  }, []);
+  }, [filterMode, user, joinedGroupIds]);
 
-  // ===== 삭제 처리 (Firestore + Storage) =====
+  // ===== 삭제 처리 (Transaction: Doc Delete + Points Rollback) =====
   const confirmDelete = (record: StudyRecord) => {
-    console.log('삭제 버튼 클릭:', record.id);
-    if (deletingId) {
-      console.log('이미 삭제 중:', deletingId);
+    // 본인 글만 삭제 가능
+    if (user?.uid && record.uid && record.uid !== user.uid) {
+      Alert.alert('권한 없음', '다른 사람의 글은 삭제할 수 없어요.');
       return;
     }
 
-    // 웹 환경에서도 작동하도록 confirm 사용
+    if (deletingId) return;
+
     if (Platform.OS === 'web') {
-      if (window.confirm('정말 삭제할까요?')) {
-        console.log('삭제 확인됨 (web)');
-        handleDelete(record);
-      } else {
-        console.log('삭제 취소 (web)');
-      }
+      if (window.confirm('정말 삭제할까요? 포인트도 함께 회수됩니다.')) handleDelete(record);
     } else {
       Alert.alert(
         '삭제',
-        '정말 삭제할까요?',
+        '정말 삭제할까요?\n(획득한 포인트도 함께 회수됩니다)',
         [
-          { 
-            text: '취소', 
-            style: 'cancel',
-            onPress: () => console.log('삭제 취소')
-          },
+          {text: '취소', style: 'cancel'},
           {
             text: '삭제',
             style: 'destructive',
-            onPress: () => {
-              console.log('삭제 확인됨');
-              handleDelete(record);
-            },
+            onPress: () => handleDelete(record),
           },
         ],
-        { cancelable: true },
+        {cancelable: true},
       );
     }
   };
 
   const handleDelete = async (record: StudyRecord) => {
-    console.log('삭제 시작:', record.id);
     try {
       setDeletingId(record.id);
 
-      // 1) Firestore 문서 먼저 삭제 (더 중요)
-      console.log('Firestore 문서 삭제 시도:', record.id);
-      await deleteDoc(doc(db, 'studyRecords', record.id));
-      console.log('Firestore 문서 삭제 완료:', record.id);
+      // --- Transaction 시작 ---
+      await runTransaction(db, async transaction => {
+        // 1. 문서 존재 확인 (이미 삭제됐을 수도 있으므로)
+        const recordRef = doc(db, 'studyRecords', record.id);
+        const recordSnap = await transaction.get(recordRef);
+        if (!recordSnap.exists()) {
+          throw new Error('Document does not exist!');
+        }
 
-      // 2) 사진이 있으면 Storage에서도 삭제 시도
+        // 2. 포인트 차감 (회수)
+        // 기존에 지급했던 포인트: record.pointsEarned 혹은 record.totalMinutes
+        const pointsToDeduct = record.pointsEarned ?? record.totalMinutes ?? 0;
+        const minutesToDeduct = record.totalMinutes ?? 0;
+
+        if (record.uid) {
+          const userRef = doc(db, 'users', record.uid);
+          transaction.update(userRef, {
+            totalPoints: increment(-pointsToDeduct),
+            totalStudyMinutes: increment(-minutesToDeduct),
+          });
+        }
+
+        if (record.groupId) {
+          const groupRef = doc(db, 'groups', record.groupId);
+          transaction.update(groupRef, {
+            totalPoints: increment(-pointsToDeduct),
+          });
+        }
+
+        // 3. 문서 삭제
+        transaction.delete(recordRef);
+      });
+      // --- Transaction 끝 ---
+
+      // 4. 이미지 삭제 (Transaction 밖에서 수행 - 실패해도 DB 정합성은 맞음)
       if (record.imageUrl) {
         try {
-          console.log('이미지 삭제 시도:', record.imageUrl);
-          // URL에서 파일 경로 추출
           const url = record.imageUrl;
-          const pathMatch = url.match(/studyCerts%2F[^?]+/);
-          if (pathMatch) {
-            const filePath = decodeURIComponent(pathMatch[0].replace(/%2F/g, '/'));
-            const imgRef = ref(storage, filePath);
-            await deleteObject(imgRef);
-            console.log('이미지 삭제 성공:', filePath);
-          } else {
-            console.log('이미지 경로 추출 실패');
+          if (url.includes('studyCerts%2F')) {
+            const pathMatch = url.match(/studyCerts%2F[^?]+/);
+            if (pathMatch) {
+              const filePath = decodeURIComponent(pathMatch[0].replace(/%2F/g, '/'));
+              const imgRef = ref(storage, filePath);
+              await deleteObject(imgRef);
+            }
           }
         } catch (err) {
           console.warn('이미지 삭제 실패(무시 가능):', err);
         }
       }
 
-      if (Platform.OS === 'web') {
-        window.alert('삭제되었습니다.');
-      } else {
-        Alert.alert('완료', '삭제되었습니다.');
-      }
+      Alert.alert('완료', '삭제되었습니다.');
     } catch (err: any) {
-      console.error('인증 삭제 에러:', err);
-      console.error('에러 상세:', err.message);
-      if (Platform.OS === 'web') {
-        window.alert(`삭제 중 오류가 발생했어요.\n${err.message || '알 수 없는 오류'}`);
-      } else {
-        Alert.alert('에러', `삭제 중 오류가 발생했어요.\n${err.message || '알 수 없는 오류'}`);
-      }
+      console.error('삭제 에러:', err);
+      Alert.alert('에러', '삭제 중 오류가 발생했습니다.');
     } finally {
       setDeletingId(null);
-      console.log('삭제 프로세스 종료');
     }
   };
 
   const renderRecord = (r: StudyRecord) => {
-    const timeText = `${r.hours}시간 ${r.minutes}분 (총 ${r.totalMinutes}분)`;
-    const modeText = r.studyMode === 'solo' ? '혼자 공부' : '다같이 공부';
+    const timeText = `${r.hours}시간 ${r.minutes}분`;
+    const modeText =
+      r.studyMode === 'group'
+        ? `다같이 공부 (${r.groupName || '그룹명 없음'})` // 그룹명 표시
+        : '혼자 공부';
+
+    const isMyPost = user?.uid && r.uid === user.uid;
 
     return (
       <View key={r.id} style={styles.card}>
-        {/* 상단: 날짜 + 모드 */}
-        <View style={styles.cardHeader}>
-          <View>
-            <Text style={styles.dateText}>{r.studyDateDisplay}</Text>
-            <Text style={styles.modeText}>{modeText}</Text>
+        {/* 작성자 정보 */}
+        <View style={styles.cardTop}>
+          <View style={styles.userInfoRow}>
+            <View style={styles.userAvatarPlaceholder}>
+              {r.userPhotoURL && !r.userPhotoURL.startsWith('blob:') ? (
+                <Image
+                  source={{uri: r.userPhotoURL}}
+                  style={{width: 32, height: 32, borderRadius: 16}}
+                />
+              ) : (
+                <View style={{width: 32, height: 32, borderRadius: 16, backgroundColor: '#eee'}} />
+              )}
+            </View>
+            <View>
+              <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                <Text style={styles.userName}>{r.userDisplayName || '사용자'}</Text>
+                {r.studyMode === 'group' && r.groupName && (
+                  <Text style={styles.groupNameText}>@{r.groupName}</Text>
+                )}
+              </View>
+              <Text style={styles.dateTextSmall}>{r.studyDateDisplay}</Text>
+            </View>
+          </View>
+          {isMyPost && (
+            <TouchableOpacity
+              style={styles.moreBtn}
+              onPress={() => confirmDelete(r)}
+              disabled={deletingId === r.id}>
+              <Text style={styles.moreBtnText}>{deletingId === r.id ? '...' : '삭제'}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* 공부 모드 & 시간 */}
+        <View style={styles.metaRow}>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{modeText}</Text>
           </View>
           <Text style={styles.timeText}>{timeText}</Text>
         </View>
 
-        {/* 중간: 이미지 + 설명 */}
+        {/* 본문: 이미지 + 설명 */}
         <View style={styles.cardBody}>
-          {r.imageUrl ? (
-            <Image source={{ uri: r.imageUrl }} style={styles.photo} />
-          ) : (
-            <View style={[styles.photo, styles.photoPlaceholder]}>
-              <Text style={{ color: GRAY, fontSize: 12 }}>사진 없음</Text>
-            </View>
-          )}
-
-          <View style={styles.descWrap}>
-            <Text style={styles.descLabel}>공부 내용</Text>
-            <Text style={styles.descText}>{r.description}</Text>
-          </View>
-        </View>
-
-        {/* 하단: 삭제 버튼 */}
-        <View style={styles.cardFooter}>
-          <TouchableOpacity
-            style={styles.deleteBtn}
-            onPress={() => confirmDelete(r)}
-            disabled={deletingId === r.id}
-          >
-            <Text style={styles.deleteText}>
-              {deletingId === r.id ? '삭제 중...' : '삭제'}
-            </Text>
-          </TouchableOpacity>
+          {r.imageUrl && <Image source={{uri: r.imageUrl}} style={styles.photo} />}
+          <Text style={styles.descText}>{r.description}</Text>
         </View>
       </View>
     );
@@ -219,10 +280,42 @@ export default function StudyFeedScreen() {
         <Text style={styles.headerTitle}>스터디 피드</Text>
         <TouchableOpacity
           style={styles.headerBtn}
-          onPress={() => router.push('/study-cert')}
-        >
+          onPress={() =>
+            router.push(
+              `/study-cert?mode=${
+                filterMode === 'group' ? 'group' : 'solo'
+              }&returnFilter=${filterMode}`,
+            )
+          }>
           <Text style={styles.headerBtnText}>＋ 인증하기</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* 필터 탭 */}
+      <View style={styles.filterContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <TouchableOpacity
+            style={[styles.filterBtn, filterMode === 'all' && styles.filterBtnActive]}
+            onPress={() => setFilterMode('all')}>
+            <Text style={[styles.filterText, filterMode === 'all' && styles.filterTextActive]}>
+              전체 피드
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterBtn, filterMode === 'group' && styles.filterBtnActive]}
+            onPress={() => setFilterMode('group')}>
+            <Text style={[styles.filterText, filterMode === 'group' && styles.filterTextActive]}>
+              내 그룹 피드
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterBtn, filterMode === 'my' && styles.filterBtnActive]}
+            onPress={() => setFilterMode('my')}>
+            <Text style={[styles.filterText, filterMode === 'my' && styles.filterTextActive]}>
+              내 공부 기록
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
 
       {loading ? (
@@ -231,22 +324,17 @@ export default function StudyFeedScreen() {
         </View>
       ) : records.length === 0 ? (
         <View style={styles.emptyWrap}>
-          <Text style={styles.emptyText}>아직 등록된 인증이 없어요.</Text>
-          <Text style={styles.emptyTextSub}>
-            아래 버튼을 눌러 첫 인증을 남겨보세요!
-          </Text>
-          <TouchableOpacity
-            style={[styles.headerBtn, { marginTop: 16 }]}
-            onPress={() => router.push('/study-cert')}
-          >
-            <Text style={styles.headerBtnText}>스터디 인증하러 가기</Text>
-          </TouchableOpacity>
+          <Text style={styles.emptyText}>표시할 인증 내용이 없어요.</Text>
+          {filterMode === 'group' && (
+            <Text style={styles.emptyTextSub}>
+              가입한 그룹이 없거나, 그룹에 올라온 글이 없어요.
+            </Text>
+          )}
         </View>
       ) : (
         <ScrollView
           contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-        >
+          showsVerticalScrollIndicator={false}>
           {records.map(renderRecord)}
         </ScrollView>
       )}
@@ -283,6 +371,32 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  filterContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  filterBtn: {
+    marginRight: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: LIGHT_CARD,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+  },
+  filterBtnActive: {
+    backgroundColor: BLUE,
+    borderColor: BLUE,
+  },
+  filterText: {
+    fontSize: 13,
+    color: GRAY,
+    fontWeight: '600',
+  },
+  filterTextActive: {
+    color: WHITE,
+  },
   listContainer: {
     paddingHorizontal: 16,
     paddingBottom: 24,
@@ -290,76 +404,88 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: LIGHT_CARD,
     borderRadius: 18,
-    padding: 14,
-    marginBottom: 12,
+    padding: 16,
+    marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
   },
-  cardHeader: {
+  cardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
-  dateText: {
-    color: TEXT_DARK,
+  userInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  userAvatarPlaceholder: {
+    marginRight: 10,
+  },
+  userName: {
     fontSize: 14,
     fontWeight: '700',
+    color: TEXT_DARK,
   },
-  modeText: {
-    color: GRAY,
+  groupNameText: {
+    fontSize: 14,
+    color: BLUE,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  dateTextSmall: {
     fontSize: 12,
+    color: GRAY,
     marginTop: 2,
   },
-  timeText: {
+  moreBtn: {
+    padding: 4,
+  },
+  moreBtnText: {
+    fontSize: 12,
+    color: '#FF5555',
+    fontWeight: '600',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  badge: {
+    backgroundColor: '#F0F4FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  badgeText: {
     color: BLUE,
     fontSize: 12,
     fontWeight: '600',
   },
+  timeText: {
+    color: TEXT_DARK,
+    fontSize: 14,
+    fontWeight: '700',
+  },
   cardBody: {
-    flexDirection: 'row',
-    marginTop: 8,
+    marginTop: 0,
   },
   photo: {
-    width: 90,
-    height: 90,
+    width: '100%',
+    height: 200,
     borderRadius: 12,
-    backgroundColor: LIGHT_BG,
-  },
-  photoPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  descWrap: {
-    flex: 1,
-    marginLeft: 10,
-  },
-  descLabel: {
-    color: GRAY,
-    fontSize: 11,
-    marginBottom: 2,
+    marginBottom: 12,
+    backgroundColor: '#f0f0f0',
+    resizeMode: 'cover',
   },
   descText: {
     color: TEXT_DARK,
-    fontSize: 13,
-  },
-  cardFooter: {
-    marginTop: 10,
-    alignItems: 'flex-end',
-  },
-  deleteBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#FF5555',
-  },
-  deleteText: {
-    fontSize: 12,
-    color: '#FF7777',
-    fontWeight: '600',
+    fontSize: 14,
+    lineHeight: 20,
   },
   loadingWrap: {
     flex: 1,
@@ -371,15 +497,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
+    marginTop: 40,
   },
   emptyText: {
     color: '#000',
-    fontSize: 15,
+    fontSize: 16,
     marginBottom: 4,
+    fontWeight: '600',
   },
   emptyTextSub: {
     color: GRAY,
-    fontSize: 13,
+    fontSize: 14,
     textAlign: 'center',
   },
 });

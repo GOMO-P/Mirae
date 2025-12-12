@@ -48,7 +48,7 @@ export const userService = {
           email: data.email,
           displayName: displayName,
           bio: data.bio,
-          photoURL: data.photoURL,
+          photoURL: data.photoURL?.startsWith('blob:') ? undefined : data.photoURL,
           followersCount: data.followersCount,
           followingCount: data.followingCount,
           createdAt: data.createdAt?.toDate(),
