@@ -39,7 +39,7 @@ import {
   arrayUnion,
   arrayRemove,
   increment,
-  deleteField, // 🔥 [추가] 필드 삭제용
+  deleteField,
 } from 'firebase/firestore';
 
 interface Message {
@@ -72,7 +72,7 @@ export default function ChatDetailScreen() {
   const [isNotificationEnabled, setIsNotificationEnabled] = useState(true);
   const [participants, setParticipants] = useState<UserInfo[]>([]);
 
-  // 🔥 [추가] 채팅방 이름 관리 상태
+  // 채팅방 이름 관리 상태
   const [currentRoomName, setCurrentRoomName] = useState(initialName || '채팅방');
   const [editableName, setEditableName] = useState(initialName || '');
 
@@ -82,7 +82,7 @@ export default function ChatDetailScreen() {
 
   const flatListRef = useRef<FlatList>(null);
 
-  // 🔥 [추가] 현재 방의 방장 ID를 저장할 state
+  // 현재 방의 방장 ID를 저장할 state
   const [roomOwnerId, setRoomOwnerId] = useState<string | null>(null);
 
   // 1. 메시지 데이터 구독
@@ -110,8 +110,6 @@ export default function ChatDetailScreen() {
   }, [roomId]);
 
   // 2. 방 정보 구독
-  // 2. 방 정보 구독
-  // 2. 방 정보 구독 (수정됨: 실시간 읽음 처리 로직 추가)
   useEffect(() => {
     if (!roomId || !user) return;
 
@@ -120,19 +118,14 @@ export default function ChatDetailScreen() {
       if (docSnap.exists()) {
         const roomData = docSnap.data();
 
-        // [수정 1] 방장 ID 가져오기
         if (roomData.createdBy) {
           setRoomOwnerId(roomData.createdBy);
         }
 
-        // [수정 2] 방 이름 동기화
         if (roomData.name) {
           setCurrentRoomName(roomData.name);
         }
 
-        // 🔥 [핵심 수정] 실시간 읽음 처리 로직
-        // 내가 현재 이 화면(채팅방)을 보고 있는데 내 안읽음 카운트가 0보다 크다면,
-        // (상대방이 방금 메시지를 보낸 상황) 즉시 0으로 초기화 요청을 보냅니다.
         const myUnreadCount = roomData.unreadCounts?.[user.uid] || 0;
 
         if (myUnreadCount > 0) {
@@ -145,15 +138,10 @@ export default function ChatDetailScreen() {
           }
         }
 
-        // ---------------------------------------------------------
-        // 아래는 기존 로직 유지 (강퇴 감지, 알림 설정, 참여자 정보 로딩)
-        // ---------------------------------------------------------
-
         const currentParticipants = roomData.participants || [];
 
-        // 강퇴 감지: 내 ID가 참여자 목록에서 사라졌는지 확인
         if (!currentParticipants.includes(user.uid)) {
-          setSettingsVisible(false); // 설정 모달 닫기
+          setSettingsVisible(false);
 
           if (Platform.OS === 'web') {
             window.alert('방장에 의해 내보내졌습니다.');
@@ -172,11 +160,9 @@ export default function ChatDetailScreen() {
           return;
         }
 
-        // 알림 설정 동기화
         const mutedList = roomData.mutedBy || [];
         setIsNotificationEnabled(!mutedList.includes(user.uid));
 
-        // 참여자 정보 상세 로딩
         if (currentParticipants.length > 0) {
           try {
             const usersRef = collection(db, 'users');
@@ -192,7 +178,6 @@ export default function ChatDetailScreen() {
           setParticipants([]);
         }
       } else {
-        // 방이 삭제된 경우
         if (Platform.OS === 'web') {
           window.alert('채팅방이 종료되었습니다.');
           router.replace('/(tabs)/chat');
@@ -268,7 +253,7 @@ export default function ChatDetailScreen() {
     }
   };
 
-  // 6. 🔥 [추가] 채팅방 이름 변경 함수
+  // 6. 채팅방 이름 변경 함수
   const notify = (title: string, message?: string) => {
     if (Platform.OS === 'web') {
       alert(`${title}\n${message ?? ''}`);
@@ -278,7 +263,6 @@ export default function ChatDetailScreen() {
   };
 
   const handleUpdateRoomName = async () => {
-    // 🔥 [추가] 방장이 아니면 권한 없음 알림
     if (roomOwnerId && user?.uid !== roomOwnerId) {
       Alert.alert('권한 없음', '채팅방 이름은 방장만 변경할 수 있습니다.');
       return;
@@ -347,7 +331,7 @@ export default function ChatDetailScreen() {
     }
   };
 
-  // 8. 나가기 로직 수정
+  // 8. 나가기 로직
   const performLeaveChat = async () => {
     if (!roomId || !user) return;
     try {
@@ -362,18 +346,14 @@ export default function ChatDetailScreen() {
 
       const roomData = roomSnap.data();
       const currentParticipants = roomData.participants || [];
-      // 내가 나간 후 남게 될 인원들
       const updatedParticipants = currentParticipants.filter((uid: string) => uid !== user.uid);
 
-      // 🔥 [수정] 남은 인원이 2명 미만(1명 또는 0명)이면 방 삭제
-      // 기존 코드: if (updatedParticipants.length < 1)
       if (updatedParticipants.length < 2) {
         await deleteDoc(roomRef);
       } else {
-        // 2명 이상 남아있다면, 나만 명단에서 빠짐
         await updateDoc(roomRef, {
           participants: updatedParticipants,
-          [`unreadCounts.${user.uid}`]: deleteField(), // 내 읽음 카운트도 삭제
+          [`unreadCounts.${user.uid}`]: deleteField(),
         });
       }
 
@@ -398,40 +378,29 @@ export default function ChatDetailScreen() {
     }
   };
 
-  // 🔥 [수정] 유저 강퇴(내보내기) 함수 - Platform 분기 적용
-  // 🔥 [수정] 유저 강퇴 함수 (2명 미만 시 방 폭파 로직 추가)
+  // 유저 강퇴(내보내기) 함수
   const handleKickUser = async (targetUser: UserInfo) => {
     if (!roomId) return;
 
     const executeKick = async () => {
       try {
         const roomRef = doc(db, 'chats', roomId);
-
-        // 현재 참여자 수에서 1명(강퇴 대상)을 뺐을 때 남은 인원 계산
-        // participants state는 현재 화면에 보이는 목록 기준입니다.
         const remainingCount = participants.length - 1;
 
-        // 🔥 [핵심 로직] 남은 인원이 2명 미만(즉, 1명 이하)이면 방 자체를 삭제
         if (remainingCount < 2) {
           await deleteDoc(roomRef);
-
-          // 방이 삭제되면 useEffect의 onSnapshot에서 "방이 종료되었습니다" 알림을 띄우고
-          // 목록 화면으로 자동 이동시키므로 별도의 이동 로직은 필요 없습니다.
         } else {
-          // 남은 인원이 2명 이상이면, 단순히 참여자 목록에서만 제거
           await updateDoc(roomRef, {
             participants: arrayRemove(targetUser.uid),
             [`unreadCounts.${targetUser.uid}`]: deleteField(),
           });
 
-          // 강퇴 알림 메시지 전송
           await addDoc(collection(db, 'chats', roomId, 'messages'), {
             text: `${targetUser.name}님이 방장에 의해 내보내졌습니다.`,
             sender: 'system',
             createdAt: serverTimestamp(),
           });
 
-          // UI 목록 업데이트
           setParticipants(prev => prev.filter(p => p.uid !== targetUser.uid));
 
           if (Platform.OS === 'web') {
@@ -446,7 +415,6 @@ export default function ChatDetailScreen() {
       }
     };
 
-    // (확인 창 로직은 기존과 동일)
     if (Platform.OS === 'web') {
       if (
         window.confirm(`${targetUser.name}님을 내보내면 방이 폭파될 수 있습니다. 진행하시겠습니까?`)
@@ -497,7 +465,6 @@ export default function ChatDetailScreen() {
     </TouchableOpacity>
   );
 
-  // 채팅방 입장 시 읽음 처리
   useEffect(() => {
     if (!roomId || !user) return;
     const resetUnreadCount = async () => {
@@ -523,7 +490,6 @@ export default function ChatDetailScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.iconButton}>
           <IconSymbol name="chevron.left" size={24} color="#006FFD" />
         </TouchableOpacity>
-        {/* 🔥 헤더 제목을 state 변수로 변경 */}
         <Text style={styles.headerTitle}>{currentRoomName}</Text>
         <TouchableOpacity onPress={() => setSettingsVisible(true)} style={styles.iconButton}>
           <IconSymbol name="gear" size={24} color="#1F2024" />
@@ -548,9 +514,7 @@ export default function ChatDetailScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}>
         <View style={styles.inputContainer}>
-          <TouchableOpacity style={styles.plusButton}>
-            <IconSymbol name="plus" size={24} color="#006FFD" />
-          </TouchableOpacity>
+          {/* 🔥 [삭제됨] + 버튼이 있던 자리입니다. */}
           <View style={styles.textInputWrapper}>
             <TextInput
               style={styles.textInput}
@@ -585,29 +549,25 @@ export default function ChatDetailScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* 채팅방 이름 변경 섹션 (방장만 가능) */}
             <View style={styles.settingItemColumn}>
               <Text style={[styles.settingText, {marginBottom: 8}]}>채팅방 이름</Text>
               <View style={{flexDirection: 'row', gap: 8}}>
                 <TextInput
                   style={[
                     styles.nameInput,
-                    // 방장이 아니면 회색 배경 & 텍스트 흐리게 처리
                     user?.uid !== roomOwnerId && {backgroundColor: '#F0F0F0', color: '#999'},
                   ]}
                   value={editableName}
                   onChangeText={setEditableName}
                   placeholder="방 이름을 입력하세요"
-                  editable={user?.uid === roomOwnerId} // 방장만 수정 가능
+                  editable={user?.uid === roomOwnerId}
                 />
-                {/* 방장일 때만 저장 버튼 표시 */}
                 {user?.uid === roomOwnerId && (
                   <TouchableOpacity style={styles.saveButton} onPress={handleUpdateRoomName}>
                     <Text style={styles.saveButtonText}>저장</Text>
                   </TouchableOpacity>
                 )}
               </View>
-              {/* 방장이 아닐 때 안내 문구 */}
               {user?.uid !== roomOwnerId && (
                 <Text style={{fontSize: 12, color: '#FF5555', marginTop: 4}}>
                   * 방장만 변경 가능합니다.
@@ -649,13 +609,11 @@ export default function ChatDetailScreen() {
                       <Text style={styles.participantName}>
                         {p.name || '이름 없음'}
                         {p.uid === user?.uid ? ' (나)' : ''}
-                        {/* 방장 표시 (왕관 아이콘 등) */}
                         {p.uid === roomOwnerId ? ' 👑' : ''}
                       </Text>
                       <Text style={styles.participantEmail}>{p.email}</Text>
                     </View>
 
-                    {/* 강퇴 버튼: 나는 방장이고, 상대방은 내가 아닐 때 표시 */}
                     {user?.uid === roomOwnerId && p.uid !== user.uid && (
                       <TouchableOpacity style={styles.kickButton} onPress={() => handleKickUser(p)}>
                         <Text style={styles.kickButtonText}>내보내기</Text>
@@ -753,7 +711,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#F0F0F0',
     backgroundColor: 'white',
   },
-  plusButton: {marginRight: 12},
+  // 🔥 [삭제됨] plusButton 스타일 제거 완료
   textInputWrapper: {
     flex: 1,
     flexDirection: 'row',
@@ -798,7 +756,6 @@ const styles = StyleSheet.create({
   },
   modalTitle: {fontSize: 16, fontWeight: '700', color: '#1F2024'},
 
-  // 🔥 [추가된 스타일] 이름 변경 UI
   settingItemColumn: {paddingVertical: 16},
   nameInput: {
     flex: 1,
@@ -855,7 +812,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: '#F0F0F0',
   },
-  // 🔥 [추가] 내보내기 버튼 스타일
   kickButton: {
     backgroundColor: '#FFEBEE',
     paddingHorizontal: 10,
