@@ -25,7 +25,7 @@ export default function JoinCompleteScreen() {
   }, [navigation]);
 
   const handleContinue = () => {
-    // 홈(Explore)으로 돌아가기
+    // 메인 화면(Explore 탭)으로 이동
     router.dismissAll();
     router.replace('/(tabs)');
   };
@@ -39,9 +39,9 @@ export default function JoinCompleteScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleCancel}>
-          <Text style={styles.cancelText}>Cancel</Text>
+          <Text style={styles.cancelText}>취소</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>참가 완료</Text>
+        <Text style={styles.headerTitle}>지원 완료</Text>
         <View style={{width: 50}} />
       </View>
 
@@ -64,14 +64,14 @@ export default function JoinCompleteScreen() {
             <View style={[styles.stepCircle, styles.stepActive]}>
               <Ionicons name="checkmark" size={16} color="#fff" />
             </View>
-            <Text style={[styles.stepText, styles.stepTextActive]}>참가 완료</Text>
+            <Text style={[styles.stepText, styles.stepTextActive]}>지원 완료</Text>
           </View>
         </View>
 
         {/* Success Message */}
         <View style={styles.messageContainer}>
-          <Text style={styles.mainMessage}>그룹 생성이 완료되었어요 ✅</Text>
-          <Text style={styles.subMessage}>새로운 그룹이 성공적으로 만들어졌습니다!</Text>
+          <Text style={styles.mainMessage}>지원서 제출이 완료되었어요 ✅</Text>
+          <Text style={styles.subMessage}>스터디 그룹 지원서가 성공적으로 제출되었습니다!</Text>
         </View>
 
         {/* Recommendation Section */}
@@ -101,7 +101,7 @@ export default function JoinCompleteScreen() {
 
       {/* Footer */}
       <View style={[styles.footer, {paddingBottom: insets.bottom + Spacing.md}]}>
-        <Button title="Continue" onPress={handleContinue} fullWidth size="md" />
+        <Button title="완료" onPress={handleContinue} fullWidth size="md" />
       </View>
     </SafeAreaView>
   );

@@ -79,8 +79,8 @@ export default function GroupApplicationScreen() {
       });
 
       setLoading(false);
-      Alert.alert('제출 완료', '지원서가 제출되었습니다. 승인을 기다려주세요.');
-      router.back();
+      // 그룹 생성 완료 화면으로 이동
+      router.push('/join-complete');
     } catch (error) {
       console.error('지원서 제출 실패:', error);
       setLoading(false);
