@@ -4,6 +4,8 @@ import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useRouter, Stack} from 'expo-router';
 import {Ionicons} from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import {ref, uploadBytes, getDownloadURL} from 'firebase/storage';
+import {storage} from '@/config/firebase';
 
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
@@ -93,9 +95,31 @@ export default function CreateGroupScreen() {
     setGroupImage('');
   };
 
+  const uploadImageToStorage = async (uri: string): Promise<string> => {
+    try {
+      // URI에서 blob 생성
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      // 고유한 파일명 생성
+      const filename = `group-images/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+      const storageRef = ref(storage, filename);
+      
+      // Firebase Storage에 업로드
+      await uploadBytes(storageRef, blob);
+      
+      // 다운로드 URL 가져오기
+      const downloadURL = await getDownloadURL(storageRef);
+      return downloadURL;
+    } catch (error) {
+      console.error('이미지 업로드 실패:', error);
+      throw error;
+    }
+  };
+
   const handlePickImage = async () => {
     const {status} = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
+
     if (status !== 'granted') {
       Alert.alert('권한 필요', '사진을 선택하려면 갤러리 접근 권한이 필요합니다.');
       return;
@@ -123,13 +147,22 @@ export default function CreateGroupScreen() {
     setLoading(true);
 
     try {
+      let imageUrl = '';
+      
+      // 이미지가 선택되었다면 Firebase Storage에 업로드
+      if (groupImage) {
+        console.log('📸 이미지 업로드 중...');
+        imageUrl = await uploadImageToStorage(groupImage);
+        console.log('✅ 이미지 업로드 완료:', imageUrl);
+      }
+
       await addGroup({
         name: groupName,
         description: groupDescription,
         categories: selectedCategories,
         maxMembers: 50,
         isMonthly: false,
-        imageUrl: groupImage,
+        imageUrl: imageUrl,
       });
 
       console.log('✅ 그룹 생성 완료, 화면 이동');
@@ -141,7 +174,7 @@ export default function CreateGroupScreen() {
       router.replace('/(tabs)');
     } catch (e) {
       console.error('❌ handleCreateGroup 에러:', e);
-      // 에러는 addGroup에서 이미 Alert로 표시됨
+      Alert.alert('오류', '그룹 생성 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -212,18 +245,7 @@ export default function CreateGroupScreen() {
                 onPress={() => handleToggleCategory(category)}
               />
             ))}
-            <TouchableOpacity style={styles.plusButton}>
-              <Ionicons name="add" size={20} color={isDark ? '#FFF' : '#333'} />
-            </TouchableOpacity>
           </View>
-        </View>
-
-        <View style={styles.section}>
-          <Collapsible title="고급 설정">
-            <Text style={[styles.collapsibleContent, {color: isDark ? '#999' : '#666'}]}>
-              프라이빗 설정, 최대 인원수, 가입 승인 방식 등을 설정하는 영역입니다. (추후 구현)
-            </Text>
-          </Collapsible>
         </View>
 
         <View style={{height: Spacing.xl}} />

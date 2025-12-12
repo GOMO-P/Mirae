@@ -143,7 +143,7 @@ export default function GroupSettingsScreen() {
 
   const handlePickImage = async () => {
     const {status} = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
+
     if (status !== 'granted') {
       Alert.alert('권한 필요', '사진을 선택하려면 갤러리 접근 권한이 필요합니다.');
       return;
@@ -222,18 +222,14 @@ export default function GroupSettingsScreen() {
     if (!user || !id) return;
 
     if (isCreator) {
-      Alert.alert(
-        '그룹 탈퇴 불가',
-        '그룹 생성자는 탈퇴할 수 없습니다. 그룹을 삭제하시겠습니까?',
-        [
-          {text: '취소', style: 'cancel'},
-          {
-            text: '삭제',
-            style: 'destructive',
-            onPress: handleDeleteGroup,
-          },
-        ],
-      );
+      Alert.alert('그룹 탈퇴 불가', '그룹 생성자는 탈퇴할 수 없습니다. 그룹을 삭제하시겠습니까?', [
+        {text: '취소', style: 'cancel'},
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: handleDeleteGroup,
+        },
+      ]);
       return;
     }
 
@@ -264,40 +260,36 @@ export default function GroupSettingsScreen() {
   const handleDeleteGroup = async () => {
     if (!id) return;
 
-    Alert.alert(
-      '그룹 삭제',
-      '정말 이 그룹을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
-      [
-        {text: '취소', style: 'cancel'},
-        {
-          text: '삭제',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // 1. 그룹 문서 삭제
-              const groupRef = doc(db, 'groups', id);
-              await deleteDoc(groupRef);
+    Alert.alert('그룹 삭제', '정말 이 그룹을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.', [
+      {text: '취소', style: 'cancel'},
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            // 1. 그룹 문서 삭제
+            const groupRef = doc(db, 'groups', id);
+            await deleteDoc(groupRef);
 
-              // 2. 그룹 채팅 메시지 삭제 (선택사항)
-              // 메시지가 많을 경우 시간이 걸릴 수 있으므로 백그라운드에서 처리
-              const messagesQuery = query(
-                collection(db, 'groupMessages'),
-                where('groupId', '==', id),
-              );
-              const messagesSnapshot = await getDocs(messagesQuery);
-              const deletePromises = messagesSnapshot.docs.map(doc => deleteDoc(doc.ref));
-              await Promise.all(deletePromises);
+            // 2. 그룹 채팅 메시지 삭제 (선택사항)
+            // 메시지가 많을 경우 시간이 걸릴 수 있으므로 백그라운드에서 처리
+            const messagesQuery = query(
+              collection(db, 'groupMessages'),
+              where('groupId', '==', id),
+            );
+            const messagesSnapshot = await getDocs(messagesQuery);
+            const deletePromises = messagesSnapshot.docs.map(doc => deleteDoc(doc.ref));
+            await Promise.all(deletePromises);
 
-              Alert.alert('삭제 완료', '그룹이 삭제되었습니다.');
-              router.replace('/(tabs)/group');
-            } catch (error) {
-              console.error('그룹 삭제 실패:', error);
-              Alert.alert('오류', '그룹 삭제에 실패했습니다.');
-            }
-          },
+            Alert.alert('삭제 완료', '그룹이 삭제되었습니다.');
+            router.replace('/(tabs)/group');
+          } catch (error) {
+            console.error('그룹 삭제 실패:', error);
+            Alert.alert('오류', '그룹 삭제에 실패했습니다.');
+          }
         },
-      ],
-    );
+      },
+    ]);
   };
 
   const handleApproveApplication = async (application: Application) => {
@@ -356,9 +348,7 @@ export default function GroupSettingsScreen() {
     return (
       <View key={item.uid} style={styles.memberItem}>
         <View style={styles.memberAvatar}>
-          <Text style={styles.memberAvatarText}>
-            {displayName.charAt(0).toUpperCase()}
-          </Text>
+          <Text style={styles.memberAvatarText}>{displayName.charAt(0).toUpperCase()}</Text>
         </View>
         <View style={styles.memberInfo}>
           <Text style={styles.memberName}>{displayName}</Text>
@@ -375,7 +365,7 @@ export default function GroupSettingsScreen() {
 
   const renderApplicationItem = (application: Application) => {
     const daysText = application.availableDays.map(d => DAYS_MAP[d] || d).join(', ');
-    
+
     return (
       <View key={application.id} style={styles.applicationItem}>
         <View style={styles.applicationContent}>
@@ -433,8 +423,8 @@ export default function GroupSettingsScreen() {
             )}
           </View>
 
-          <TouchableOpacity 
-            style={styles.imageContainer} 
+          <TouchableOpacity
+            style={styles.imageContainer}
             onPress={isCreator ? handlePickImage : undefined}
             disabled={!isCreator}>
             {newGroupImage ? (
@@ -531,7 +521,8 @@ export default function GroupSettingsScreen() {
               <TouchableOpacity
                 style={[styles.tab, activeTab === 'applications' && styles.activeTab]}
                 onPress={() => setActiveTab('applications')}>
-                <Text style={[styles.tabText, activeTab === 'applications' && styles.activeTabText]}>
+                <Text
+                  style={[styles.tabText, activeTab === 'applications' && styles.activeTabText]}>
                   지원서 목록 ({applications.length})
                 </Text>
               </TouchableOpacity>
@@ -576,9 +567,7 @@ export default function GroupSettingsScreen() {
         {/* 그룹 탈퇴 */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.leaveButton} onPress={handleLeaveGroup}>
-            <Text style={styles.leaveButtonText}>
-              {isCreator ? '그룹 삭제' : '그룹 탈퇴'}
-            </Text>
+            <Text style={styles.leaveButtonText}>{isCreator ? '그룹 삭제' : '그룹 탈퇴'}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

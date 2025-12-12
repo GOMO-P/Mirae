@@ -65,7 +65,7 @@ export default function GroupDetailScreen() {
   // 이미 가입한 그룹인지 확인
   const isAlreadyJoined = joinedGroupIds.includes(groupData.id);
 
-  const [isLiked, setIsLiked] = useState(false);
+
   const [isJoining, setIsJoining] = useState(false);
   const [members, setMembers] = useState<UserProfile[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
@@ -238,13 +238,6 @@ export default function GroupDetailScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.iconButton}>
           <Ionicons name="close" size={30} color={textColor} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => setIsLiked(!isLiked)} style={styles.iconButton}>
-          <Ionicons
-            name={isLiked ? 'heart' : 'heart-outline'}
-            size={24}
-            color={isLiked ? Colors.error.main : textColor}
-          />
-        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -337,7 +330,7 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,

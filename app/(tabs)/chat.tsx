@@ -26,9 +26,7 @@ import {
   query,
   orderBy,
   addDoc,
-  updateDoc,
   getDoc,
-  deleteDoc,
   serverTimestamp,
   getDocs,
   where,
@@ -51,9 +49,36 @@ interface UserData {
   email: string;
 }
 
+const USERS_COLLECTION = 'users';
+
+async function getFollowingProfiles(userId: string): Promise<UserData[]> {
+  try {
+    const followingRef = collection(db, USERS_COLLECTION, userId, 'following');
+    const snapshot = await getDocs(followingRef);
+
+    if (snapshot.empty) return [];
+
+    const followingIds = snapshot.docs.map(doc => doc.id);
+
+    const profiles = await Promise.all(
+      followingIds.map(async id => {
+        const userDocRef = doc(db, USERS_COLLECTION, id);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          return userDocSnap.data() as UserData;
+        }
+        return null;
+      }),
+    );
+    return profiles.filter((p): p is UserData => p !== null);
+  } catch (error) {
+    console.error('Error getting following profiles:', error);
+    return [];
+  }
+}
+
 export default function ChatScreen() {
   const router = useRouter();
-  // useAuthContext에서 loading 상태도 가져옵니다.
   const {user, loading: authLoading} = useAuthContext();
 
   const [chatList, setChatList] = useState<ChatRoom[]>([]);
@@ -64,7 +89,7 @@ export default function ChatScreen() {
 
   const [userMap, setUserMap] = useState<{[key: string]: string}>({});
 
-  // 1. 유저 목록 가져오기 (이름 매칭용) - 한 번만 실행
+  // 1. 유저 목록 가져오기 (이름 매칭용)
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'users'), snapshot => {
       const map: {[key: string]: string} = {};
@@ -80,7 +105,7 @@ export default function ChatScreen() {
   // 2. 채팅방 목록 가져오기
   useEffect(() => {
     if (!user) return;
-    // 유저 정보가 없거나 로딩 중이면 구독하지 않음
+
     const chatsRef = collection(db, 'chats');
     const q = query(
       chatsRef,
@@ -95,18 +120,17 @@ export default function ChatScreen() {
           ...doc.data(),
         }));
         setChatList(rooms as ChatRoom[]);
-        setLoading(false); // 로딩 종료
+        setLoading(false);
       },
-      // 2. 실패 시 실행되는 콜백 (이게 없어서 무한 로딩 중일 수 있음)
       error => {
         console.error('채팅 목록 불러오기 실패:', error);
-        setLoading(false); // 에러가 나도 로딩은 꺼야 함
+        setLoading(false);
       },
     );
 
     return () => unsubscribe();
   }, [user]);
-  // (알림 함수 생략 - 동일)
+
   async function schedulePushNotification(title: string, body: string) {
     await Notifications.scheduleNotificationAsync({
       content: {title, body, sound: true},
@@ -114,31 +138,27 @@ export default function ChatScreen() {
     });
   }
 
-  // 친구 목록 불러오기
+  // 친구 목록 불러오기: 팔로우하는 사용자만 조회
   const fetchUsers = async () => {
     if (!user) return;
     setLoadingUsers(true);
     try {
-      const q = query(collection(db, 'users'), where('uid', '!=', user.uid));
-      const querySnapshot = await getDocs(q);
-      const userList: UserData[] = [];
-      querySnapshot.forEach(doc => userList.push(doc.data() as UserData));
-      setUsers(userList);
+      const followingProfiles = await getFollowingProfiles(user.uid);
+      setUsers(followingProfiles);
     } catch (error) {
-      console.error('Error fetching users: ', error);
+      console.error('Error fetching following users: ', error);
+      Alert.alert('오류', '팔로잉 목록을 불러오는 데 실패했습니다.');
     } finally {
       setLoadingUsers(false);
     }
   };
 
-  // 모달 열릴 때만 호출
   useEffect(() => {
     if (modalVisible && user) {
       fetchUsers();
     }
   }, [modalVisible, user]);
 
-  // 채팅방 생성 (동일)
   const handleCreateChat = async (selectedUser: UserData) => {
     if (!user) return;
     try {
@@ -167,18 +187,11 @@ export default function ChatScreen() {
     }
   };
 
-  // 렌더링
   const renderChatItem = ({item}: {item: ChatRoom}) => {
     const myUnreadCount = item.unreadCounts?.[user?.uid || ''] || 0;
 
-    // 1. DB에 저장된 채팅방 이름(item.name)이 있으면 그걸 최우선으로 씁니다.
     let displayName = item.name;
-
-    // 2. 만약 채팅방 이름이 비어있다면, 상대방 이름을 찾아서 씁니다.
     const hasCustomName = item.name && item.name.trim().length > 0;
-
-    // (참고: 로직에 따라 '이름이 유저 이름과 같으면' 상대방 이름으로 보여주는 로직이 필요할 수도 있습니다.
-    // 일단 현재는 DB에 name이 있으면 무조건 그걸 보여줍니다.)
 
     if (!hasCustomName && item.participants) {
       const otherId = item.participants.find(uid => uid !== user?.uid);
@@ -191,7 +204,6 @@ export default function ChatScreen() {
       <TouchableOpacity
         style={styles.chatItem}
         onPress={() =>
-          //[수정됨] 상세 화면으로 갈 때 결정된 displayName을 같이 보냅니다.
           router.push({
             pathname: '/chat/[id]',
             params: {id: item.id, name: displayName},
@@ -233,7 +245,6 @@ export default function ChatScreen() {
     </TouchableOpacity>
   );
 
-  // 로딩 화면 처리
   if (authLoading) {
     return (
       <View style={[styles.container, styles.center]}>
@@ -246,12 +257,13 @@ export default function ChatScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.statusBarPlaceholder} />
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerLeftButton}>
-          <Text style={styles.headerButtonText}>수정</Text>
-        </TouchableOpacity>
+        {/* [수정됨] 수정 버튼 제거 -> 레이아웃 유지를 위해 빈 View로 대체 */}
+        <View style={styles.headerLeftButton} />
+
         <View style={styles.headerTitleWrapper}>
           <Text style={styles.headerTitle}>채팅 목록</Text>
         </View>
+
         <TouchableOpacity style={styles.headerRightButton} onPress={() => setModalVisible(true)}>
           <IconSymbol name="plus" size={24} color="#006FFD" />
         </TouchableOpacity>
@@ -310,7 +322,7 @@ export default function ChatScreen() {
                 contentContainerStyle={{paddingBottom: 16}}
                 ListEmptyComponent={
                   <Text style={{textAlign: 'center', color: '#8F9098', marginTop: 20}}>
-                    친구 없음
+                    팔로우하는 친구가 없습니다.
                   </Text>
                 }
               />

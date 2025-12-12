@@ -7,24 +7,6 @@ import GroupListItem from '@/components/ui/GroupListItem';
 import {Colors, Typography, Spacing, BorderRadius} from '@/constants/design-tokens';
 import {Ionicons} from '@expo/vector-icons';
 
-// 추천 그룹 Mock Data
-const RECOMMENDED_GROUPS = [
-  {
-    id: 'rec1',
-    name: '정보처리기사 자격증 반',
-    description: '정처기 따는 사람 모두 모여!',
-    currentMembers: 20,
-    maxMembers: 50,
-  },
-  {
-    id: 'rec2',
-    name: '토익 900점 목표 반',
-    description: '매일 아침 단어 시험 봅니다.',
-    currentMembers: 15,
-    maxMembers: 30,
-  },
-];
-
 export default function JoinCompleteScreen() {
   const router = useRouter();
   const navigation = useNavigation();

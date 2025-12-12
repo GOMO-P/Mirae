@@ -90,9 +90,6 @@ export default function SettingsScreen() {
               source={photoURL ? {uri: photoURL} : require('@/assets/images/react-logo.png')}
               style={styles.avatar}
             />
-            <TouchableOpacity style={styles.editIconContainer}>
-              <Ionicons name="pencil" size={14} color="white" />
-            </TouchableOpacity>
           </View>
           <Text style={[styles.userName, {color: textColor}]}>{userName}</Text>
           <Text style={[styles.userTag, {color: secondaryTextColor}]}>@{userTag}</Text>
