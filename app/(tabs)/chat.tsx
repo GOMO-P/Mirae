@@ -26,15 +26,11 @@ import {
   query,
   orderBy,
   addDoc,
-  updateDoc,
   getDoc,
-  deleteDoc,
   serverTimestamp,
   getDocs,
   where,
 } from 'firebase/firestore';
-
-// --- (ChatRoom, UserData interface는 원본과 동일) ---
 
 interface ChatRoom {
   id: string;
@@ -53,11 +49,8 @@ interface UserData {
   email: string;
 }
 
-// User Profile Service 파일의 구조를 가정하고 함수를 만듭니다.
 const USERS_COLLECTION = 'users';
 
-// 외부에서 가져와야 하지만, 현재 파일 내부에 임시로 필요한 로직을 구현합니다.
-// 실제로는 `userService.getUserProfile` 또는 `userService.getUserProfiles`을 사용해야 합니다.
 async function getFollowingProfiles(userId: string): Promise<UserData[]> {
   try {
     const followingRef = collection(db, USERS_COLLECTION, userId, 'following');
@@ -67,7 +60,6 @@ async function getFollowingProfiles(userId: string): Promise<UserData[]> {
 
     const followingIds = snapshot.docs.map(doc => doc.id);
 
-    // 팔로잉 ID를 기반으로 각 UserProfile을 병렬로 조회합니다.
     const profiles = await Promise.all(
       followingIds.map(async id => {
         const userDocRef = doc(db, USERS_COLLECTION, id);
@@ -78,7 +70,6 @@ async function getFollowingProfiles(userId: string): Promise<UserData[]> {
         return null;
       }),
     );
-    // null 값 제거 후 UserData[] 반환
     return profiles.filter((p): p is UserData => p !== null);
   } catch (error) {
     console.error('Error getting following profiles:', error);
@@ -93,13 +84,12 @@ export default function ChatScreen() {
   const [chatList, setChatList] = useState<ChatRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
-  // [수정됨] users는 이제 팔로우하는 사람만 담습니다.
   const [users, setUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
   const [userMap, setUserMap] = useState<{[key: string]: string}>({});
 
-  // 1. 유저 목록 가져오기 (이름 매칭용) - 원본과 동일
+  // 1. 유저 목록 가져오기 (이름 매칭용)
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'users'), snapshot => {
       const map: {[key: string]: string} = {};
@@ -112,7 +102,7 @@ export default function ChatScreen() {
     return () => unsubscribe();
   }, []);
 
-  // 2. 채팅방 목록 가져오기 - 원본과 동일
+  // 2. 채팅방 목록 가져오기
   useEffect(() => {
     if (!user) return;
 
@@ -141,7 +131,6 @@ export default function ChatScreen() {
     return () => unsubscribe();
   }, [user]);
 
-  // (알림 함수 생략 - 동일)
   async function schedulePushNotification(title: string, body: string) {
     await Notifications.scheduleNotificationAsync({
       content: {title, body, sound: true},
@@ -149,14 +138,12 @@ export default function ChatScreen() {
     });
   }
 
-  // [수정됨] 친구 목록 불러오기: 팔로우하는 사용자만 조회
+  // 친구 목록 불러오기: 팔로우하는 사용자만 조회
   const fetchUsers = async () => {
     if (!user) return;
     setLoadingUsers(true);
     try {
-      // **핵심 수정 부분:** 전체 users 대신 following 서브컬렉션을 기반으로 프로필을 가져옵니다.
       const followingProfiles = await getFollowingProfiles(user.uid);
-
       setUsers(followingProfiles);
     } catch (error) {
       console.error('Error fetching following users: ', error);
@@ -166,14 +153,12 @@ export default function ChatScreen() {
     }
   };
 
-  // 모달 열릴 때만 호출 - 원본과 동일
   useEffect(() => {
     if (modalVisible && user) {
       fetchUsers();
     }
   }, [modalVisible, user]);
 
-  // 채팅방 생성 - 원본과 동일
   const handleCreateChat = async (selectedUser: UserData) => {
     if (!user) return;
     try {
@@ -202,12 +187,10 @@ export default function ChatScreen() {
     }
   };
 
-  // 렌더링 함수 - 원본과 동일
   const renderChatItem = ({item}: {item: ChatRoom}) => {
     const myUnreadCount = item.unreadCounts?.[user?.uid || ''] || 0;
 
     let displayName = item.name;
-
     const hasCustomName = item.name && item.name.trim().length > 0;
 
     if (!hasCustomName && item.participants) {
@@ -262,7 +245,6 @@ export default function ChatScreen() {
     </TouchableOpacity>
   );
 
-  // 로딩 화면 처리 - 원본과 동일
   if (authLoading) {
     return (
       <View style={[styles.container, styles.center]}>
@@ -271,17 +253,17 @@ export default function ChatScreen() {
     );
   }
 
-  // --- (JSX 렌더링 부분은 원본과 동일) ---
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.statusBarPlaceholder} />
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerLeftButton}>
-          <Text style={styles.headerButtonText}>수정</Text>
-        </TouchableOpacity>
+        {/* [수정됨] 수정 버튼 제거 -> 레이아웃 유지를 위해 빈 View로 대체 */}
+        <View style={styles.headerLeftButton} />
+
         <View style={styles.headerTitleWrapper}>
           <Text style={styles.headerTitle}>채팅 목록</Text>
         </View>
+
         <TouchableOpacity style={styles.headerRightButton} onPress={() => setModalVisible(true)}>
           <IconSymbol name="plus" size={24} color="#006FFD" />
         </TouchableOpacity>
@@ -355,8 +337,6 @@ export default function ChatScreen() {
   );
 }
 
-// --- (스타일시트 부분은 원본과 동일) ---
-// (스타일 코드는 변경 사항이 없으므로 생략)
 const styles = StyleSheet.create({
   center: {flex: 1, justifyContent: 'center', alignItems: 'center'},
   container: {flex: 1, backgroundColor: 'white'},
