@@ -14,7 +14,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRouter, useLocalSearchParams, Stack} from 'expo-router';
 import {useGroupContext} from '@/contexts/GroupContext';
 import {useAuthContext} from '@/contexts/AuthContext';
-import {UserProfile, userService} from '@/services/userService';
+import {UserProfile} from '@/services/userService';
 import {
   doc,
   updateDoc,
@@ -79,7 +79,6 @@ export default function GroupSettingsScreen() {
   const [updating, setUpdating] = useState(false);
   const [applications, setApplications] = useState<Application[]>([]);
   const [loadingApplications, setLoadingApplications] = useState(true);
-  const [followStates, setFollowStates] = useState<{[key: string]: boolean}>({});
 
   const currentGroup = groups.find(g => g.id === id);
   const isCreator = currentGroup?.createdBy === user?.uid;
@@ -93,17 +92,6 @@ export default function GroupSettingsScreen() {
       try {
         const memberProfiles = await getGroupMembers(id);
         setMembers(memberProfiles);
-
-        // 팔로우 상태 확인
-        if (user?.uid) {
-          const states: {[key: string]: boolean} = {};
-          for (const member of memberProfiles) {
-            if (member.uid !== user.uid) {
-              states[member.uid] = await userService.isFollowing(user.uid, member.uid);
-            }
-          }
-          setFollowStates(states);
-        }
       } catch (error) {
         console.error('멤버 정보 로드 실패:', error);
       } finally {
@@ -112,7 +100,7 @@ export default function GroupSettingsScreen() {
     };
 
     fetchMembers();
-  }, [id, getGroupMembers, user?.uid]);
+  }, [id, getGroupMembers]);
 
   // 지원서 실시간 구독
   useEffect(() => {
@@ -352,38 +340,10 @@ export default function GroupSettingsScreen() {
     ]);
   };
 
-  // 팔로우/언팔로우 핸들러
-  const handleFollowToggle = async (targetUid: string) => {
-    if (!user?.uid) {
-      Alert.alert('로그인 필요', '로그인이 필요합니다.');
-      return;
-    }
-
-    const isCurrentlyFollowing = followStates[targetUid];
-
-    try {
-      if (isCurrentlyFollowing) {
-        await userService.unfollowUser(user.uid, targetUid);
-      } else {
-        await userService.followUser(user.uid, targetUid);
-      }
-
-      // 상태 업데이트
-      setFollowStates(prev => ({
-        ...prev,
-        [targetUid]: !isCurrentlyFollowing,
-      }));
-    } catch (error) {
-      console.error('팔로우 토글 실패:', error);
-      Alert.alert('오류', '팔로우 처리에 실패했습니다.');
-    }
-  };
-
   const renderMemberItem = (item: UserProfile, index: number) => {
     const role = index === 0 ? '방장' : '팀원';
     const isCurrentUser = user?.uid === item.uid;
     const displayName = item.displayName || (item as any).name || item.email || '익명';
-    const isFollowing = followStates[item.uid];
 
     return (
       <View key={item.uid} style={styles.memberItem}>
@@ -395,12 +355,8 @@ export default function GroupSettingsScreen() {
           <Text style={styles.memberRole}>{role}</Text>
         </View>
         {!isCurrentUser && (
-          <TouchableOpacity
-            style={[styles.followButton, isFollowing && styles.unfollowButton]}
-            onPress={() => handleFollowToggle(item.uid)}>
-            <Text style={[styles.followButtonText, isFollowing && styles.unfollowButtonText]}>
-              {isFollowing ? '언팔로우' : '팔로우'}
-            </Text>
+          <TouchableOpacity style={styles.followButton}>
+            <Text style={styles.followButtonText}>팔로우</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -771,16 +727,10 @@ const styles = StyleSheet.create({
     borderColor: BLUE,
     backgroundColor: WHITE,
   },
-  unfollowButton: {
-    borderColor: '#EF4444',
-  },
   followButtonText: {
     fontSize: 13,
     fontWeight: '600',
     color: BLUE,
-  },
-  unfollowButtonText: {
-    color: '#EF4444',
   },
   loadingContainer: {
     flexDirection: 'row',

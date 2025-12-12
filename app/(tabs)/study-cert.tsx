@@ -29,7 +29,6 @@ import {ref, uploadBytes, getDownloadURL} from 'firebase/storage';
 
 import {useAuthContext} from '@/contexts/AuthContext';
 import {useGroupContext} from '@/contexts/GroupContext';
-import {userService, UserProfile} from '@/services/userService';
 
 const BLUE = '#4A90E2';
 const LIGHT_BG = '#F5F7FA';
@@ -60,18 +59,6 @@ export default function StudyCertScreen() {
   // 그룹 선택 관련 state
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [groupModalVisible, setGroupModalVisible] = useState(false);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-
-  // 사용자 프로필 로드 (Firestore에서 displayName 가져오기)
-  useEffect(() => {
-    const loadUserProfile = async () => {
-      if (user?.uid) {
-        const profile = await userService.getUserProfile(user.uid);
-        setUserProfile(profile);
-      }
-    };
-    loadUserProfile();
-  }, [user?.uid]);
 
   // ===== 날짜 조절 =====
   const changeMonth = (delta: number) => {
@@ -205,9 +192,8 @@ export default function StudyCertScreen() {
         const newRecordRef = doc(collection(db, 'studyRecords'));
         transaction.set(newRecordRef, {
           uid: user.uid,
-          userDisplayName:
-            userProfile?.displayName || user.displayName || user.email?.split('@')[0] || '익명',
-          userPhotoURL: userProfile?.photoURL || user.photoURL || null,
+          userDisplayName: user.displayName || '익명',
+          userPhotoURL: user.photoURL || null,
           studyMode, // 'solo' | 'group'
           groupId: studyMode === 'group' ? selectedGroupId : null,
           groupName: studyMode === 'group' ? selectedGroupName : null,

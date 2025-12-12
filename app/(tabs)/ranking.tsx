@@ -60,10 +60,7 @@ export default function RankingScreen() {
         const d = doc.data();
         return {
           id: doc.id,
-          name:
-            mode === 'personal'
-              ? d.displayName || d.name || d.email?.split('@')[0] || '익명'
-              : d.name,
+          name: mode === 'personal' ? d.displayName || '익명' : d.name,
           score: d.totalPoints || 0,
           subtitle: mode === 'personal' ? d.bio || '' : d.description || '',
           photoURL: mode === 'personal' ? d.photoURL : d.imageUrl,
