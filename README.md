@@ -1,6 +1,6 @@
 # Mirae - Group-Study Support App 
 
-React Native (Expo) 기반의 그룹 스터디 지원 모바일 애플리케이션입니다.
+**함께 성장하는 즐거움 | 그룹 스터디를 위한 올인원 소셜 플랫폼**
 
 ##  프로젝트 소개
 
@@ -8,7 +8,8 @@ React Native (Expo) 기반의 그룹 스터디 지원 모바일 애플리케이�
   <img src="./assets/images/mirae-banner.png" width="100%" />
 </div>
 
-Mirae(이하 미래)는 사용자들이 다양한 주제의 그룹을 만들고, 검색하고, 참여할 수 있는 소셜 그룹 지원 앱입니다.
+**Mirae(미래)**는 혼자 하는 공부의 외로움을 해결하고, 함께 성장하는 환경을 제공하는 스터디 플랫폼입니다.
+사용자는 관심사가 같은 사람들과 그룹을 형성하고, 실시간으로 소통하며, 서로의 공부를 인증하고 랭킹 시스템을 통해 동기를 부여받을 수 있습니다.
 
 ### 주요 기능
 
@@ -41,8 +42,6 @@ Mirae(이하 미래)는 사용자들이 다양한 주제의 그룹을 만들고,
 - **Icons**: Expo Vector Icons (@expo/vector-icons)
 <br>
 
-### 📱 Prerequisites
-
 | Platform | Requirement |
 | :--- | :--- |
 | **Common** | `Node.js 18+`, `npm` or `yarn` |
@@ -54,16 +53,23 @@ Mirae(이하 미래)는 사용자들이 다양한 주제의 그룹을 만들고,
 1. **의존성 설치**
 
    ```bash
+   git clone [https://github.com/gomo-p/mirae.git](https://github.com/gomo-p/mirae.git)
+   cd mirae
+   ```
+
+2. **의존성 설치**
+
+   ```bash
    npm install
    ```
 
-2. **개발 서버 시작**
+3. **개발 서버 시작**
 
    ```bash
    npx expo start
    ```
 
-3. **앱 실행**
+4. **앱 실행**
    - iOS: `i` 키를 눌러 iOS 시뮬레이터에서 실행(Mac)
    - Android: `a` 키를 눌러 Android 에뮬레이터에서 실행(ex. Android Studio)
    - 웹: `w` 키를 눌러 웹 브라우저에서 실행
@@ -80,7 +86,7 @@ Mirae(이하 미래)는 사용자들이 다양한 주제의 그룹을 만들고,
 
 ### 환경 설정
 
-Firebase 설정은 `config/firebase.ts`에 있습니다. 본인의 Firebase 프로젝트를 사용하려면 해당 파일의 설정을 업데이트하세요.
+환경 설정 config/firebase.ts 파일에 본인의 Firebase 프로젝트 키를 설정합니다.
 
 ##  화면 구성
 <br>
@@ -120,7 +126,6 @@ Firebase 설정은 `config/firebase.ts`에 있습니다. 본인의 Firebase 프�
 - **랭킹 탭 전환** - 개인 랭킹(Personal)과 그룹 랭킹(Group)을 탭으로 전환하여 조회
 - **실시간 순위 리스트** - 데이터 베이스와 실시간 연동하여, 총 학습 포인트 합산에 따른 1위부터 50위까지의 순위 표시.(개인/그룹)
 
-
 ### 6. 설정 화면 (Setting)
 
 - 사용자 프로필 및 정보
@@ -128,8 +133,6 @@ Firebase 설정은 `config/firebase.ts`에 있습니다. 본인의 Firebase 프�
 - 자기소개 편집
 - 로그아웃 기능
 <br>
-
-
 
 ##  개발 현황
 
