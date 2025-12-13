@@ -9,6 +9,7 @@ import {
   TextInput,
   ActivityIndicator,
   Image,
+  Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRouter, useLocalSearchParams, Stack} from 'expo-router';
@@ -363,28 +364,53 @@ export default function GroupSettingsScreen() {
     }
   };
 
-  const handleRejectApplication = async (application: Application) => {
+const handleRejectApplication = async (application: Application) => {
     if (!id) return;
 
-    Alert.alert('지원 거절', `${application.name}님의 지원을 거절하시겠습니까?`, [
-      {text: '취소', style: 'cancel'},
-      {
-        text: '거절',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            const appRef = doc(db, 'groupApplications', application.id);
-            await updateDoc(appRef, {
-              status: 'rejected',
-            });
-            Alert.alert('거절 완료', '지원을 거절했습니다.');
-          } catch (error) {
-            console.error('거절 실패:', error);
-            Alert.alert('오류', '거절에 실패했습니다.');
-          }
+    // 1. 실제 거절 로직을 수행하는 함수 (웹/앱 공통 사용)
+    const executeReject = async () => {
+      try {
+        const appRef = doc(db, 'groupApplications', application.id);
+        await updateDoc(appRef, {
+          status: 'rejected',
+        });
+        
+        // 성공 알림 분기
+        if (Platform.OS === 'web') {
+          window.alert('거절 완료: 지원을 거절했습니다.');
+        } else {
+          Alert.alert('거절 완료', '지원을 거절했습니다.');
+        }
+      } catch (error) {
+        console.error('거절 실패:', error);
+        
+        // 실패 알림 분기
+        if (Platform.OS === 'web') {
+          window.alert('오류: 거절에 실패했습니다.');
+        } else {
+          Alert.alert('오류', '거절에 실패했습니다.');
+        }
+      }
+    };
+
+    // 2. 플랫폼에 따른 확인 창 분기 처리
+    if (Platform.OS === 'web') {
+      // ✅ 웹: 브라우저 기본 confirm 창 사용
+      const isConfirmed = window.confirm(`${application.name}님의 지원을 거절하시겠습니까?`);
+      if (isConfirmed) {
+        await executeReject();
+      }
+    } else {
+      // ✅ 앱(iOS/Android): Native Alert 사용
+      Alert.alert('지원 거절', `${application.name}님의 지원을 거절하시겠습니까?`, [
+        {text: '취소', style: 'cancel'},
+        {
+          text: '거절',
+          style: 'destructive',
+          onPress: executeReject, // 분리해둔 로직 함수 실행
         },
-      },
-    ]);
+      ]);
+    }
   };
 
   const renderMemberItem = (item: UserProfile, index: number) => {
