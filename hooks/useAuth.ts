@@ -45,9 +45,13 @@ export default function useAuth() {
       await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,
         email: user.email,
-        name: name || '이름 없음',
+        displayName: name || user.email?.split('@')[0] || '익명', // 랭킹에서 사용
+        name: name || '이름 없음', // 하위 호환성
         photoURL: user.photoURL || null,
         createdAt: serverTimestamp(),
+        followersCount: 0,
+        followingCount: 0,
+        totalPoints: 0,
       });
 
       setLoading(false);
