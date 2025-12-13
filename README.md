@@ -69,17 +69,17 @@ Mirae
 │   ├── rooms
 │   │   └── [roomid].tsx            # 스터디룸/방 상세 화면
 │   ├── _layout.tsx                 # 앱 전체의 레이아웃
-│   ├── create-group.tsx            # 새 그룹 만들기 화면
+│   ├── create-group.tsx            # 그룹 생성 화면
 │   ├── customer-center.tsx         # 고객 센터 화면
 │   ├── delete-account.tsx          # 회원 탈퇴 화면
 │   ├── followers-list.tsx          # 팔로워 목록 화면
 │   ├── following-list.tsx          # 팔로잉 목록 화면
-│   ├── group-application.tsx       # 그룹 지원서 관리 화면
+│   ├── group-application.tsx       # 스터디 지원서 작성 화면
 │   ├── group-chat.tsx              # 그룹 채팅 화면
 │   ├── group-detail.tsx            # 그룹 상세 정보 화면
-│   ├── group-list.tsx              # 그룹 리스트 화면
-│   ├── group-settings.tsx          # 그룹 설정 변경 화면
-│   ├── join-complete.tsx           # 가입 완료 안내 화면
+│   ├── group-list.tsx              # 그룹 목록(검색 & 카테고리)
+│   ├── group-settings.tsx          # 그룹 설정 화면
+│   ├── join-complete.tsx           # 가입 완료 확인 화면
 │   ├── language.tsx                # 언어 설정 화면
 │   ├── modal.tsx                   # 공통 모달 화면
 │   ├── notifications.tsx           # 알림 목록 화면
@@ -100,7 +100,7 @@ Mirae
 │   │   ├── GroupCard.tsx           # 그룹 정보를 보여주는 카드 컴포넌트
 │   │   ├── GroupListItem.tsx       # 그룹 목록의 개별 아이템 컴포넌트
 │   │   ├── Input.tsx               # 텍스트 입력창 컴포넌트
-│   │   ├── MemberListItem.tsx      # 멤버 목록의 개별 아이템 컴포넌트
+│   │   ├── MemberListItem.tsx      # 그룹 멤버 표시용 컴포넌트
 │   │   ├── SearchBar.tsx           # 검색바 컴포넌트
 │   │   ├── StatCounter.tsx         # 통계 수치 표시 컴포넌트
 │   │   ├── TextLink.tsx            # 텍스트 링크 컴포넌트
