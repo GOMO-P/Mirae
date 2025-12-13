@@ -1,6 +1,6 @@
 # Mirae - Group-Study Support App 
 
-React Native (Expo) 기반의 그룹스터디 지원 모바일 애플리케이션입니다.
+React Native (Expo) 기반의 그룹 스터디 지원 모바일 애플리케이션입니다.
 
 ##  프로젝트 소개
 
@@ -30,6 +30,15 @@ Mirae(이하 미래)는 사용자들이 다양한 주제의 그룹을 만들고,
   <img src="https://img.shields.io/badge/React%20Native-0.81-61DAFB?style=for-the-badge&logo=react&logoColor=black" />
 </div>
 
+- **Framework**: React Native (Expo)
+- **Language**: TypeScript
+- **Navigation**: Expo Router (file-based routing)
+- **Authentication**: Firebase Auth
+- **Database**: Firebase Firestore
+- **Storage**: Firebase Storage 
+- **State Management**: React Context API
+- **Styling**: StyleSheet (React Native)
+- **Icons**: Expo Vector Icons (@expo/vector-icons)
 <br>
 
 ### 📱 Prerequisites
@@ -58,6 +67,99 @@ Mirae(이하 미래)는 사용자들이 다양한 주제의 그룹을 만들고,
    - iOS: `i` 키를 눌러 iOS 시뮬레이터에서 실행(Mac)
    - Android: `a` 키를 눌러 Android 에뮬레이터에서 실행(ex. Android Studio)
    - 웹: `w` 키를 눌러 웹 브라우저에서 실행
+
+##  Firebase 설정
+
+이 프로젝트는 Firebase를 사용하여 인증 및 데이터 저장을 처리합니다.
+
+### Firebase 서비스
+
+- **Authentication** - 이메일/비밀번호 인증
+- **Firestore** - 그룹 및 사용자 데이터 저장
+- **Storage** - 이미지 업로드
+
+### 환경 설정
+
+Firebase 설정은 `config/firebase.ts`에 있습니다. 본인의 Firebase 프로젝트를 사용하려면 해당 파일의 설정을 업데이트하세요.
+
+##  화면 구성
+<br>
+
+### 1. 가입 화면
+
+- **회원가입** - 이메일/비밀번호로 계정 생성
+- **로그인** - 기존 계정으로 로그인
+
+### 2. 탐색 화면 (Explore)
+
+- 이달의 그룹 섹션
+- 인기있는 그룹 섹션
+- 그룹 검색 기능
+- 그룹 생성 버튼
+- 그룹 가입 기능
+
+### 3. 개인 채팅 화면 (Chat)
+
+- 채팅 화면
+- 실시간 채팅 기능
+- 팔로우한 사람들을 조회하여 채팅 초대 기능
+- 안 읽은 메세지 표시 기능
+- 채팅방 설정 기능(채팅방 이름 변경, 강퇴 등)
+
+### 4. 그룹 화면 (Group)
+
+- 가입한 그룹을 표시
+- 그룹의 실시간 채팅 기능
+- 스터디 인증(개인/그룹) 기능
+- 스터디 피드 기능
+- 그룹 채팅방 설정 기능
+- 그룹 채팅방 내 팔로우 기능
+
+### 5. 랭킹 화면 (Ranking)
+
+- **랭킹 탭 전환** - 개인 랭킹(Personal)과 그룹 랭킹(Group)을 탭으로 전환하여 조회
+- **실시간 순위 리스트** - 데이터 베이스와 실시간 연동하여, 총 학습 포인트 합산에 따른 1위부터 50위까지의 순위 표시.(개인/그룹)
+
+
+### 6. 설정 화면 (Setting)
+
+- 사용자 프로필 및 정보
+- 팔로워/팔로잉
+- 자기소개 편집
+- 로그아웃 기능
+<br>
+
+
+
+##  개발 현황
+
+### 완료된 기능 
+
+[x] UI 컴포넌트 라이브러리 (재사용 가능한 아토믹 컴포넌트)
+
+[x] Firebase 인증 시스템 (회원가입, 로그인, 로그아웃)
+
+[x] 전역 상태 관리 (AuthContext, GroupContext)
+
+[x] 메인 화면 (그룹 목록, 랭킹)
+
+[x] 프로필 화면 (사용자 정보)
+
+[x] 그룹 생성 기능
+
+[x] 데이터베이스 연동 (Firestore)
+
+[x] 그룹 검색 기능 (카테고리 및 키워드)
+
+[x] 그룹 참여 로직 (참여 시 유저 목록 갱신 및 내 그룹 탭 연동)
+
+[x] 소셜 기능 (팔로우 / 팔로워)
+
+[x] 스터디 지원서 (작성 및 조회 기능)
+
+[x] 그룹 관리 (탈퇴 및 설정)
+
+[x] 통계 기능(랭킹)
 
 ##  프로젝트 구조
 
@@ -154,120 +256,5 @@ Mirae
     └── alert.ts                    # 알림(Alert) 표시 헬퍼 함수
 
 ```
-
-##  디자인 시스템
-
-프로젝트는 일관된 디자인을 위해 중앙 집중식 디자인 토큰 시스템을 사용합니다.
-
-### 주요 디자인 토큰
-
-- **Colors** - Primary, Success, Warning, Error, Background, Text
-- **Typography** - Font sizes, weights, line heights
-- **Spacing** - 일관된 여백 시스템 (xs, sm, md, lg, xl, 2xl, 3xl)
-- **Border Radius** - 모서리 둥글기 (sm, md, lg, xl, full)
-- **Shadows** - 그림자 효과 (sm, md, lg, xl)
-
-##  Firebase 설정
-
-이 프로젝트는 Firebase를 사용하여 인증 및 데이터 저장을 처리합니다.
-
-### Firebase 서비스
-
-- **Authentication** - 이메일/비밀번호 인증
-- **Firestore** - 그룹 및 사용자 데이터 저장
-- **Storage** - 이미지 업로드
-
-### 환경 설정
-
-Firebase 설정은 `config/firebase.ts`에 있습니다. 본인의 Firebase 프로젝트를 사용하려면 해당 파일의 설정을 업데이트하세요.
-
-##  화면 구성
-<br>
-
-### 1. 가입 화면
-
-- **회원가입** - 이메일/비밀번호로 계정 생성
-- **로그인** - 기존 계정으로 로그인
-
-### 2. 탐색 화면 (Explore)
-
-- 이달의 그룹 섹션
-- 인기있는 그룹 섹션
-- 그룹 검색 기능
-- 그룹 생성 버튼
-- 그룹 가입 기능
-
-### 3. 개인 채팅 화면 (Chat)
-
-- 채팅 화면
-- 실시간 채팅 기능
-- 팔로우한 사람들을 조회하여 채팅 초대 기능
-- 안 읽은 메세지 표시 기능
-- 채팅방 설정 기능(채팅방 이름 변경, 강퇴 등)
-
-### 4. 그룹 화면 (Group)
-
-- 가입한 그룹을 표시
-- 그룹의 실시간 채팅 기능
-- 스터디 인증(개인/그룹) 기능
-- 스터디 피드 기능
-- 그룹 채팅방 설정 기능
-- 그룹 채팅방 내 팔로우 기능
-
-### 5. 랭킹 화면 (Ranking)
-
-- **랭킹 탭 전환** - 개인 랭킹(Personal)과 그룹 랭킹(Group)을 탭으로 전환하여 조회
-- **실시간 순위 리스트** - 데이터 베이스와 실시간 연동하여, 총 학습 포인트 합산에 따른 1위부터 50위까지의 순위 표시.(개인/그룹)
-
-
-### 6. 설정 화면 (Setting)
-
-- 사용자 프로필 및 정보
-- 팔로워/팔로잉
-- 자기소개 편집
-- 로그아웃 기능
-<br>
-
-##  기술 스택
-
-- **Framework**: React Native (Expo)
-- **Language**: TypeScript
-- **Navigation**: Expo Router (file-based routing)
-- **Authentication**: Firebase Auth
-- **Database**: Firebase Firestore
-- **Storage**: Firebase Storage 
-- **State Management**: React Context API
-- **Styling**: StyleSheet (React Native)
-- **Icons**: Expo Vector Icons (@expo/vector-icons)
-
-##  개발 현황
-
-### 완료된 기능 
-
-[x] UI 컴포넌트 라이브러리 (재사용 가능한 아토믹 컴포넌트)
-
-[x] Firebase 인증 시스템 (회원가입, 로그인, 로그아웃)
-
-[x] 전역 상태 관리 (AuthContext, GroupContext)
-
-[x] 메인 화면 (그룹 목록, 랭킹)
-
-[x] 프로필 화면 (사용자 정보)
-
-[x] 그룹 생성 기능
-
-[x] 데이터베이스 연동 (Firestore)
-
-[x] 그룹 검색 기능 (카테고리 및 키워드)
-
-[x] 그룹 참여 로직 (참여 시 유저 목록 갱신 및 내 그룹 탭 연동)
-
-[x] 소셜 기능 (팔로우 / 팔로워)
-
-[x] 스터디 지원서 (작성 및 조회 기능)
-
-[x] 그룹 관리 (탈퇴 및 설정)
-
-[x] 통계 기능(랭킹)
 
 **Last Updated**: 2025-12-14
