@@ -162,6 +162,30 @@ export default function GroupSettingsScreen() {
     }
   };
 
+  const uploadImageToStorage = async (uri: string): Promise<string> => {
+    try {
+      // URI에서 blob 생성
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      // 고유한 파일명 생성
+      const filename = `group-images/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+      const {ref, uploadBytes, getDownloadURL} = await import('firebase/storage');
+      const {storage} = await import('@/config/firebase');
+      const storageRef = ref(storage, filename);
+      
+      // Firebase Storage에 업로드
+      await uploadBytes(storageRef, blob);
+      
+      // 다운로드 URL 가져오기
+      const downloadURL = await getDownloadURL(storageRef);
+      return downloadURL;
+    } catch (error) {
+      console.error('이미지 업로드 실패:', error);
+      throw error;
+    }
+  };
+
   const handleUpdateGroupImage = async () => {
     if (!id) {
       Alert.alert('오류', '그룹 정보를 찾을 수 없습니다.');
@@ -173,15 +197,30 @@ export default function GroupSettingsScreen() {
       return;
     }
 
+    if (!newGroupImage) {
+      Alert.alert('오류', '이미지를 선택해주세요.');
+      return;
+    }
+
     setUpdating(true);
     try {
+      let imageUrl = newGroupImage;
+      
+      // 로컬 이미지인 경우 Firebase Storage에 업로드
+      if (newGroupImage.startsWith('file://') || newGroupImage.startsWith('content://')) {
+        console.log('📸 이미지 업로드 중...');
+        imageUrl = await uploadImageToStorage(newGroupImage);
+        console.log('✅ 이미지 업로드 완료:', imageUrl);
+      }
+
       const groupRef = doc(db, 'groups', id);
       await updateDoc(groupRef, {
-        imageUrl: newGroupImage,
+        imageUrl: imageUrl,
       });
 
       Alert.alert('성공', '그룹 이미지가 변경되었습니다.');
       setIsEditingImage(false);
+      setNewGroupImage(imageUrl); // 업로드된 URL로 업데이트
     } catch (error) {
       console.error('그룹 이미지 변경 실패:', error);
       Alert.alert('오류', '그룹 이미지 변경에 실패했습니다.');
