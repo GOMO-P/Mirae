@@ -207,7 +207,15 @@ export default function GroupSettingsScreen() {
       let imageUrl = newGroupImage;
       
       // 로컬 이미지인 경우 Firebase Storage에 업로드
-      if (newGroupImage.startsWith('file://') || newGroupImage.startsWith('content://')) {
+      // 모바일: file://, content://
+      // 웹: blob:, http://localhost, data:
+      const isLocalImage = newGroupImage.startsWith('file://') || 
+                          newGroupImage.startsWith('content://') ||
+                          newGroupImage.startsWith('blob:') ||
+                          newGroupImage.startsWith('http://localhost') ||
+                          newGroupImage.startsWith('data:');
+      
+      if (isLocalImage) {
         console.log('📸 이미지 업로드 중...');
         imageUrl = await uploadImageToStorage(newGroupImage);
         console.log('✅ 이미지 업로드 완료:', imageUrl);
