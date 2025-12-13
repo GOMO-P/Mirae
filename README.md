@@ -1,14 +1,14 @@
-# GOMO - Group Management App 
+# Mirae - GroupStudy Support App 
 
-React Native (Expo) 기반의 그룹 관리 모바일 애플리케이션입니다.
+React Native (Expo) 기반의 그룹스터디 지원 모바일 애플리케이션입니다.
 
 ##  프로젝트 소개
 
-GOMO는 사용자들이 다양한 주제의 그룹을 만들고, 검색하고, 참여할 수 있는 소셜 그룹 관리 플랫폼입니다.
+Mirae(이하 미래)는 사용자들이 다양한 주제의 그룹을 만들고, 검색하고, 참여할 수 있는 소셜 그룹 지원 앱입니다.
 
 ### 주요 기능
 
-- �**사용자 인증** - Firebase를 이용한 회원가입/로그인/로그아웃
+-  **사용자 인증** - Firebase를 이용한 회원가입/로그인/로그아웃
 -  **그룹 탐색** - 이달의 그룹, 인기있는 그룹 목록 조회
 -  **프로필 관리** - 사용자 프로필, 팔로워/팔로잉, 자기소개 편집
 -  **그룹 검색** - 카테고리별 그룹 검색 
@@ -18,12 +18,23 @@ GOMO는 사용자들이 다양한 주제의 그룹을 만들고, 검색하고, �
 
 ##  시작하기
 
-### 필수 요구사항
+### 🛠️ Tech Stack & Requirements
 
-- Node.js 18 이상
-- npm 또는 yarn
-- Expo CLI
-- iOS Simulator (Mac) 또는 Android Emulator
+<div align="left">
+  <img src="https://img.shields.io/badge/Node.js-18%2B-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" />
+  <img src="https://img.shields.io/badge/Expo-SDK%2054-000020?style=for-the-badge&logo=expo&logoColor=white" />
+  <img src="https://img.shields.io/badge/React%20Native-0.81-61DAFB?style=for-the-badge&logo=react&logoColor=black" />
+</div>
+
+<br>
+
+### 📱 Prerequisites
+
+| Platform | Requirement |
+| :--- | :--- |
+| **Common** | `Node.js 18+`, `npm` or `yarn` |
+| **iOS** | iOS 15.1+ (Simulator or Physical Device) |
+| **Android** | Android 7.0+ (API 24+, Nougat) |
 
 ### 설치 및 실행
 
