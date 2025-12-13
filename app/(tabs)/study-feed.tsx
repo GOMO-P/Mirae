@@ -305,7 +305,7 @@ export default function StudyFeedScreen() {
             style={[styles.filterBtn, filterMode === 'group' && styles.filterBtnActive]}
             onPress={() => setFilterMode('group')}>
             <Text style={[styles.filterText, filterMode === 'group' && styles.filterTextActive]}>
-              내 그룹 피드
+              그룹 피드
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
