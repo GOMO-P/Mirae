@@ -86,6 +86,9 @@ export default function ChatScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [users, setUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  
+  // [추가됨] 검색어 상태 관리
+  const [searchText, setSearchText] = useState('');
 
   const [userMap, setUserMap] = useState<{[key: string]: string}>({});
 
@@ -130,6 +133,30 @@ export default function ChatScreen() {
 
     return () => unsubscribe();
   }, [user]);
+
+  // [추가됨] 채팅방 이름 결정 헬퍼 함수
+  const getDisplayName = (room: ChatRoom) => {
+    // 1. 방에 설정된 커스텀 이름이 있으면 우선 사용
+    if (room.name && room.name.trim().length > 0) {
+      return room.name;
+    }
+    // 2. 1:1 채팅인 경우 상대방 이름 표시
+    if (room.participants) {
+      const otherId = room.participants.find(uid => uid !== user?.uid);
+      if (otherId && userMap[otherId]) {
+        return userMap[otherId];
+      }
+    }
+    return room.name || '알 수 없음';
+  };
+
+  // [추가됨] 검색어가 적용된 리스트 필터링
+  const filteredChatList = chatList.filter(room => {
+    const displayName = getDisplayName(room);
+    // 검색어가 없으면 모두 표시, 있으면 이름에 포함되는지 확인 (대소문자 무시)
+    if (!searchText.trim()) return true;
+    return displayName.toLowerCase().includes(searchText.toLowerCase());
+  });
 
   async function schedulePushNotification(title: string, body: string) {
     await Notifications.scheduleNotificationAsync({
@@ -189,16 +216,9 @@ export default function ChatScreen() {
 
   const renderChatItem = ({item}: {item: ChatRoom}) => {
     const myUnreadCount = item.unreadCounts?.[user?.uid || ''] || 0;
-
-    let displayName = item.name;
-    const hasCustomName = item.name && item.name.trim().length > 0;
-
-    if (!hasCustomName && item.participants) {
-      const otherId = item.participants.find(uid => uid !== user?.uid);
-      if (otherId && userMap[otherId]) {
-        displayName = userMap[otherId];
-      }
-    }
+    
+    // [수정됨] 헬퍼 함수 사용하여 이름 가져오기
+    const displayName = getDisplayName(item);
 
     return (
       <TouchableOpacity
@@ -257,7 +277,6 @@ export default function ChatScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.statusBarPlaceholder} />
       <View style={styles.header}>
-        {/* [수정됨] 수정 버튼 제거 -> 레이아웃 유지를 위해 빈 View로 대체 */}
         <View style={styles.headerLeftButton} />
 
         <View style={styles.headerTitleWrapper}>
@@ -276,6 +295,11 @@ export default function ChatScreen() {
             placeholder="Search"
             placeholderTextColor="#8F9098"
             style={styles.searchInput}
+            // [수정됨] 검색어 상태 연결
+            value={searchText}
+            onChangeText={setSearchText}
+            autoCapitalize="none"
+            autoCorrect={false}
           />
         </View>
       </View>
@@ -286,14 +310,19 @@ export default function ChatScreen() {
         </View>
       ) : (
         <FlatList
-          data={chatList}
+          // [수정됨] 전체 리스트 대신 필터링된 리스트 사용
+          data={filteredChatList}
           renderItem={renderChatItem}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             <View style={{padding: 40, alignItems: 'center'}}>
-              <Text style={{color: '#8F9098', marginBottom: 8}}>채팅방이 없습니다.</Text>
-              <Text style={{color: '#006FFD'}}>우측 상단 + 버튼을 눌러보세요!</Text>
+              <Text style={{color: '#8F9098', marginBottom: 8}}>
+                {searchText ? '검색 결과가 없습니다.' : '채팅방이 없습니다.'}
+              </Text>
+              {!searchText && (
+                <Text style={{color: '#006FFD'}}>우측 상단 + 버튼을 눌러보세요!</Text>
+              )}
             </View>
           }
         />
