@@ -14,6 +14,7 @@ import {
   Switch,
   Alert,
   ScrollView,
+  Image, // [추가됨] 이미지 렌더링용
 } from 'react-native';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 import {IconSymbol} from '@/components/ui/icon-symbol';
@@ -53,6 +54,7 @@ interface UserInfo {
   uid: string;
   name: string;
   email: string;
+  photoURL?: string; // [추가됨] 프로필 사진 URL 필드 추가
 }
 
 export default function ChatDetailScreen() {
@@ -454,9 +456,14 @@ export default function ChatDetailScreen() {
     );
   };
 
+  // [수정됨] 초대 목록에서 사진 표시
   const renderInviteItem = ({item}: {item: UserInfo}) => (
     <TouchableOpacity style={styles.inviteItem} onPress={() => handleInviteUser(item)}>
-      <View style={styles.avatarSmall} />
+      {item.photoURL ? (
+        <Image source={{uri: item.photoURL}} style={styles.avatarImage} />
+      ) : (
+        <View style={styles.avatarSmall} />
+      )}
       <View>
         <Text style={styles.participantName}>{item.name}</Text>
         <Text style={styles.participantEmail}>{item.email}</Text>
@@ -514,7 +521,6 @@ export default function ChatDetailScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}>
         <View style={styles.inputContainer}>
-          {/* 🔥 [삭제됨] + 버튼이 있던 자리입니다. */}
           <View style={styles.textInputWrapper}>
             <TextInput
               style={styles.textInput}
@@ -604,7 +610,12 @@ export default function ChatDetailScreen() {
               {participants.length > 0 ? (
                 participants.map(p => (
                   <View key={p.uid} style={styles.participantItem}>
-                    <View style={styles.avatarSmall} />
+                    {/* [수정됨] 참여자 목록에서 사진 표시 */}
+                    {p.photoURL ? (
+                      <Image source={{uri: p.photoURL}} style={styles.avatarImage} />
+                    ) : (
+                      <View style={styles.avatarSmall} />
+                    )}
                     <View style={{flex: 1}}>
                       <Text style={styles.participantName}>
                         {p.name || '이름 없음'}
@@ -711,7 +722,6 @@ const styles = StyleSheet.create({
     borderTopColor: '#F0F0F0',
     backgroundColor: 'white',
   },
-  // 🔥 [삭제됨] plusButton 스타일 제거 완료
   textInputWrapper: {
     flex: 1,
     flexDirection: 'row',
@@ -795,6 +805,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   avatarSmall: {width: 32, height: 32, borderRadius: 12, backgroundColor: '#B4DBFF'},
+  // [추가됨] 이미지 스타일
+  avatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 12,
+    resizeMode: 'cover',
+    marginRight: 0, // participantItem의 gap이 간격을 대신하므로 0
+  },
   participantName: {fontSize: 14, fontWeight: '600', color: '#1F2024'},
   participantEmail: {fontSize: 12, color: '#71727A'},
   leaveButton: {
@@ -811,6 +829,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 0.5,
     borderBottomColor: '#F0F0F0',
+    gap: 12, // [추가됨] inviteItem 내부 간격 일관성
   },
   kickButton: {
     backgroundColor: '#FFEBEE',

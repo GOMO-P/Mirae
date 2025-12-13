@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Modal,
   Alert,
+  Image, // [추가됨] 이미지 렌더링용
 } from 'react-native';
 import {IconSymbol} from '@/components/ui/icon-symbol';
 import {useRouter} from 'expo-router';
@@ -47,6 +48,7 @@ interface UserData {
   uid: string;
   name: string;
   email: string;
+  photoURL?: string; // [추가됨] 프로필 사진 URL
 }
 
 const USERS_COLLECTION = 'users';
@@ -86,16 +88,25 @@ export default function ChatScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [users, setUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  
+  // 검색어 상태 관리
+  const [searchText, setSearchText] = useState('');
 
-  const [userMap, setUserMap] = useState<{[key: string]: string}>({});
+  // [수정됨] 이름뿐만 아니라 전체 유저 데이터를 매핑 (사진 정보 포함)
+  const [userMap, setUserMap] = useState<{[key: string]: UserData}>({});
 
-  // 1. 유저 목록 가져오기 (이름 매칭용)
+  // 1. 유저 목록 실시간 구독 (이름 및 사진 매칭용)
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'users'), snapshot => {
-      const map: {[key: string]: string} = {};
+      const map: {[key: string]: UserData} = {};
       snapshot.docs.forEach(doc => {
         const data = doc.data();
-        map[data.uid] = data.name || '알 수 없음';
+        map[data.uid] = {
+          uid: data.uid,
+          name: data.name || '알 수 없음',
+          email: data.email || '',
+          photoURL: data.photoURL, // [추가됨] Firestore 필드값 가져오기
+        };
       });
       setUserMap(map);
     });
@@ -131,6 +142,38 @@ export default function ChatScreen() {
     return () => unsubscribe();
   }, [user]);
 
+  // [수정됨] 상대방 유저 객체를 가져오는 함수
+  const getOtherUser = (room: ChatRoom): UserData | null => {
+    if (room.participants) {
+      const otherId = room.participants.find(uid => uid !== user?.uid);
+      if (otherId && userMap[otherId]) {
+        return userMap[otherId];
+      }
+    }
+    return null;
+  };
+
+  // [수정됨] 채팅방 이름 결정 헬퍼 함수
+  const getDisplayName = (room: ChatRoom) => {
+    // 1. 방에 설정된 커스텀 이름이 있으면 우선 사용
+    if (room.name && room.name.trim().length > 0) {
+      return room.name;
+    }
+    // 2. 1:1 채팅인 경우 상대방 이름 표시
+    const otherUser = getOtherUser(room);
+    if (otherUser) {
+      return otherUser.name;
+    }
+    return room.name || '알 수 없음';
+  };
+
+  // 검색어가 적용된 리스트 필터링
+  const filteredChatList = chatList.filter(room => {
+    const displayName = getDisplayName(room);
+    if (!searchText.trim()) return true;
+    return displayName.toLowerCase().includes(searchText.toLowerCase());
+  });
+
   async function schedulePushNotification(title: string, body: string) {
     await Notifications.scheduleNotificationAsync({
       content: {title, body, sound: true},
@@ -138,7 +181,7 @@ export default function ChatScreen() {
     });
   }
 
-  // 친구 목록 불러오기: 팔로우하는 사용자만 조회
+  // 친구 목록 불러오기
   const fetchUsers = async () => {
     if (!user) return;
     setLoadingUsers(true);
@@ -189,16 +232,12 @@ export default function ChatScreen() {
 
   const renderChatItem = ({item}: {item: ChatRoom}) => {
     const myUnreadCount = item.unreadCounts?.[user?.uid || ''] || 0;
-
-    let displayName = item.name;
-    const hasCustomName = item.name && item.name.trim().length > 0;
-
-    if (!hasCustomName && item.participants) {
-      const otherId = item.participants.find(uid => uid !== user?.uid);
-      if (otherId && userMap[otherId]) {
-        displayName = userMap[otherId];
-      }
-    }
+    
+    // 헬퍼 함수 사용하여 이름 가져오기
+    const displayName = getDisplayName(item);
+    
+    // 상대방 유저 정보(사진 포함) 가져오기
+    const otherUser = getOtherUser(item);
 
     return (
       <TouchableOpacity
@@ -210,8 +249,18 @@ export default function ChatScreen() {
           })
         }>
         <View style={styles.avatarContainer}>
-          <View style={[styles.avatarHead, {backgroundColor: item.avatarBgColor}]} />
-          <View style={[styles.avatarBody, {backgroundColor: item.avatarBgColor}]} />
+          {/* [수정됨] photoURL이 있으면 이미지 표시, 없으면 기존 도형 표시 */}
+          {otherUser?.photoURL ? (
+            <Image 
+              source={{uri: otherUser.photoURL}} 
+              style={styles.avatarImage} 
+            />
+          ) : (
+            <>
+              <View style={[styles.avatarHead, {backgroundColor: item.avatarBgColor}]} />
+              <View style={[styles.avatarBody, {backgroundColor: item.avatarBgColor}]} />
+            </>
+          )}
         </View>
 
         <View style={styles.textContainer}>
@@ -235,8 +284,18 @@ export default function ChatScreen() {
   const renderUserItem = ({item}: {item: UserData}) => (
     <TouchableOpacity style={styles.userItem} onPress={() => handleCreateChat(item)}>
       <View style={[styles.avatarContainer, {width: 36, height: 36, marginRight: 12}]}>
-        <View style={[styles.avatarHead, {backgroundColor: '#E0E0E0'}]} />
-        <View style={[styles.avatarBody, {backgroundColor: '#E0E0E0'}]} />
+         {/* [수정됨] 친구 선택 목록에서도 사진이 있으면 표시 */}
+         {item.photoURL ? (
+            <Image 
+              source={{uri: item.photoURL}} 
+              style={styles.avatarImage} 
+            />
+         ) : (
+            <>
+              <View style={[styles.avatarHead, {backgroundColor: '#E0E0E0'}]} />
+              <View style={[styles.avatarBody, {backgroundColor: '#E0E0E0'}]} />
+            </>
+         )}
       </View>
       <View>
         <Text style={styles.userName}>{item.name}</Text>
@@ -257,7 +316,6 @@ export default function ChatScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.statusBarPlaceholder} />
       <View style={styles.header}>
-        {/* [수정됨] 수정 버튼 제거 -> 레이아웃 유지를 위해 빈 View로 대체 */}
         <View style={styles.headerLeftButton} />
 
         <View style={styles.headerTitleWrapper}>
@@ -276,6 +334,10 @@ export default function ChatScreen() {
             placeholder="Search"
             placeholderTextColor="#8F9098"
             style={styles.searchInput}
+            value={searchText}
+            onChangeText={setSearchText}
+            autoCapitalize="none"
+            autoCorrect={false}
           />
         </View>
       </View>
@@ -286,14 +348,18 @@ export default function ChatScreen() {
         </View>
       ) : (
         <FlatList
-          data={chatList}
+          data={filteredChatList}
           renderItem={renderChatItem}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             <View style={{padding: 40, alignItems: 'center'}}>
-              <Text style={{color: '#8F9098', marginBottom: 8}}>채팅방이 없습니다.</Text>
-              <Text style={{color: '#006FFD'}}>우측 상단 + 버튼을 눌러보세요!</Text>
+              <Text style={{color: '#8F9098', marginBottom: 8}}>
+                {searchText ? '검색 결과가 없습니다.' : '채팅방이 없습니다.'}
+              </Text>
+              {!searchText && (
+                <Text style={{color: '#006FFD'}}>우측 상단 + 버튼을 눌러보세요!</Text>
+              )}
             </View>
           }
         />
@@ -395,6 +461,12 @@ const styles = StyleSheet.create({
     marginRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // [추가됨] 이미지 스타일
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   avatarHead: {width: 16, height: 16, borderRadius: 8, position: 'absolute', top: 8},
   avatarBody: {width: 24, height: 24, borderRadius: 12, position: 'absolute', bottom: -10},

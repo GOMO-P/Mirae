@@ -5,16 +5,17 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Alert,
   TextInput,
   ActivityIndicator,
   Image,
+  Platform,
 } from 'react-native';
+import {showSimpleAlert, showConfirmAlert, showAlert} from '@/utils/alert';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRouter, useLocalSearchParams, Stack} from 'expo-router';
 import {useGroupContext} from '@/contexts/GroupContext';
 import {useAuthContext} from '@/contexts/AuthContext';
-import {UserProfile} from '@/services/userService';
+import {UserProfile, userService} from '@/services/userService';
 import {
   doc,
   updateDoc,
@@ -79,6 +80,8 @@ export default function GroupSettingsScreen() {
   const [updating, setUpdating] = useState(false);
   const [applications, setApplications] = useState<Application[]>([]);
   const [loadingApplications, setLoadingApplications] = useState(true);
+  const [followStates, setFollowStates] = useState<{[key: string]: boolean}>({});
+  const [followLoading, setFollowLoading] = useState<{[key: string]: boolean}>({});
 
   const currentGroup = groups.find(g => g.id === id);
   const isCreator = currentGroup?.createdBy === user?.uid;
@@ -92,6 +95,17 @@ export default function GroupSettingsScreen() {
       try {
         const memberProfiles = await getGroupMembers(id);
         setMembers(memberProfiles);
+
+        // 팔로우 상태 확인
+        if (user?.uid && memberProfiles.length > 0) {
+          const followingList = await userService.getFollowing(user.uid);
+          const followingIds = followingList.map(u => u.uid);
+          const initialFollowStates: {[key: string]: boolean} = {};
+          memberProfiles.forEach(member => {
+            initialFollowStates[member.uid] = followingIds.includes(member.uid);
+          });
+          setFollowStates(initialFollowStates);
+        }
       } catch (error) {
         console.error('멤버 정보 로드 실패:', error);
       } finally {
@@ -100,7 +114,7 @@ export default function GroupSettingsScreen() {
     };
 
     fetchMembers();
-  }, [id, getGroupMembers]);
+  }, [id, getGroupMembers, user]);
 
   // 지원서 실시간 구독
   useEffect(() => {
@@ -145,7 +159,7 @@ export default function GroupSettingsScreen() {
     const {status} = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (status !== 'granted') {
-      Alert.alert('권한 필요', '사진을 선택하려면 갤러리 접근 권한이 필요합니다.');
+      showSimpleAlert('권한 필요', '사진을 선택하려면 갤러리 접근 권한이 필요합니다.');
       return;
     }
 
@@ -162,29 +176,76 @@ export default function GroupSettingsScreen() {
     }
   };
 
+  const uploadImageToStorage = async (uri: string): Promise<string> => {
+    try {
+      // URI에서 blob 생성
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      // 고유한 파일명 생성
+      const filename = `group-images/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+      const {ref, uploadBytes, getDownloadURL} = await import('firebase/storage');
+      const {storage} = await import('@/config/firebase');
+      const storageRef = ref(storage, filename);
+      
+      // Firebase Storage에 업로드
+      await uploadBytes(storageRef, blob);
+      
+      // 다운로드 URL 가져오기
+      const downloadURL = await getDownloadURL(storageRef);
+      return downloadURL;
+    } catch (error) {
+      console.error('이미지 업로드 실패:', error);
+      throw error;
+    }
+  };
+
   const handleUpdateGroupImage = async () => {
     if (!id) {
-      Alert.alert('오류', '그룹 정보를 찾을 수 없습니다.');
+      showSimpleAlert('오류', '그룹 정보를 찾을 수 없습니다.');
       return;
     }
 
     if (!isCreator) {
-      Alert.alert('권한 없음', '그룹 생성자만 이미지를 변경할 수 있습니다.');
+      showSimpleAlert('권한 없음', '그룹 생성자만 이미지를 변경할 수 있습니다.');
+      return;
+    }
+
+    if (!newGroupImage) {
+      showSimpleAlert('오류', '이미지를 선택해주세요.');
       return;
     }
 
     setUpdating(true);
     try {
+      let imageUrl = newGroupImage;
+      
+      // 로컬 이미지인 경우 Firebase Storage에 업로드
+      // 모바일: file://, content://
+      // 웹: blob:, http://localhost, data:
+      const isLocalImage = newGroupImage.startsWith('file://') || 
+                          newGroupImage.startsWith('content://') ||
+                          newGroupImage.startsWith('blob:') ||
+                          newGroupImage.startsWith('http://localhost') ||
+                          newGroupImage.startsWith('data:');
+      
+      if (isLocalImage) {
+        console.log('📸 이미지 업로드 중...');
+        imageUrl = await uploadImageToStorage(newGroupImage);
+        console.log('✅ 이미지 업로드 완료:', imageUrl);
+      }
+
       const groupRef = doc(db, 'groups', id);
       await updateDoc(groupRef, {
-        imageUrl: newGroupImage,
+        imageUrl: imageUrl,
       });
 
-      Alert.alert('성공', '그룹 이미지가 변경되었습니다.');
+      showSimpleAlert('성공', '그룹 이미지가 변경되었습니다.');
       setIsEditingImage(false);
+      setNewGroupImage(imageUrl); // 업로드된 URL로 업데이트
     } catch (error) {
       console.error('그룹 이미지 변경 실패:', error);
-      Alert.alert('오류', '그룹 이미지 변경에 실패했습니다.');
+      showSimpleAlert('오류', '그룹 이미지 변경에 실패했습니다.');
     } finally {
       setUpdating(false);
     }
@@ -192,12 +253,12 @@ export default function GroupSettingsScreen() {
 
   const handleUpdateGroupName = async () => {
     if (!id || !newGroupName.trim()) {
-      Alert.alert('오류', '그룹 이름을 입력해주세요.');
+      showSimpleAlert('오류', '그룹 이름을 입력해주세요.');
       return;
     }
 
     if (!isCreator) {
-      Alert.alert('권한 없음', '그룹 생성자만 이름을 변경할 수 있습니다.');
+      showSimpleAlert('권한 없음', '그룹 생성자만 이름을 변경할 수 있습니다.');
       return;
     }
 
@@ -208,11 +269,11 @@ export default function GroupSettingsScreen() {
         name: newGroupName.trim(),
       });
 
-      Alert.alert('성공', '그룹 이름이 변경되었습니다.');
+      showSimpleAlert('성공', '그룹 이름이 변경되었습니다.');
       setIsEditingName(false);
     } catch (error) {
       console.error('그룹 이름 변경 실패:', error);
-      Alert.alert('오류', '그룹 이름 변경에 실패했습니다.');
+      showSimpleAlert('오류', '그룹 이름 변경에 실패했습니다.');
     } finally {
       setUpdating(false);
     }
@@ -222,74 +283,67 @@ export default function GroupSettingsScreen() {
     if (!user || !id) return;
 
     if (isCreator) {
-      Alert.alert('그룹 탈퇴 불가', '그룹 생성자는 탈퇴할 수 없습니다. 그룹을 삭제하시겠습니까?', [
-        {text: '취소', style: 'cancel'},
-        {
-          text: '삭제',
-          style: 'destructive',
-          onPress: handleDeleteGroup,
-        },
-      ]);
+      showConfirmAlert(
+        '그룹 탈퇴 불가', 
+        '그룹 생성자는 탈퇴할 수 없습니다. 그룹을 삭제하시겠습니까?',
+        handleDeleteGroup
+      );
       return;
     }
 
-    Alert.alert('그룹 탈퇴', '정말 이 그룹에서 탈퇴하시겠습니까?', [
-      {text: '취소', style: 'cancel'},
-      {
-        text: '탈퇴',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            const groupRef = doc(db, 'groups', id);
-            await updateDoc(groupRef, {
-              members: arrayRemove(user.uid),
-              currentMembers: increment(-1),
-            });
+    showConfirmAlert(
+      '그룹 탈퇴', 
+      '정말 이 그룹에서 탈퇴하시겠습니까?',
+      async () => {
+        try {
+          const groupRef = doc(db, 'groups', id);
+          await updateDoc(groupRef, {
+            members: arrayRemove(user.uid),
+            currentMembers: increment(-1),
+          });
 
-            Alert.alert('탈퇴 완료', '그룹에서 탈퇴했습니다.');
+          showSimpleAlert('탈퇴 완료', '그룹에서 탈퇴했습니다.', () => {
             router.replace('/(tabs)/group');
-          } catch (error) {
-            console.error('그룹 탈퇴 실패:', error);
-            Alert.alert('오류', '그룹 탈퇴에 실패했습니다.');
-          }
-        },
-      },
-    ]);
+          });
+        } catch (error) {
+          console.error('그룹 탈퇴 실패:', error);
+          showSimpleAlert('오류', '그룹 탈퇴에 실패했습니다.');
+        }
+      }
+    );
   };
 
   const handleDeleteGroup = async () => {
     if (!id) return;
 
-    Alert.alert('그룹 삭제', '정말 이 그룹을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.', [
-      {text: '취소', style: 'cancel'},
-      {
-        text: '삭제',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            // 1. 그룹 문서 삭제
-            const groupRef = doc(db, 'groups', id);
-            await deleteDoc(groupRef);
+    showConfirmAlert(
+      '그룹 삭제', 
+      '정말 이 그룹을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
+      async () => {
+        try {
+          // 1. 그룹 문서 삭제
+          const groupRef = doc(db, 'groups', id);
+          await deleteDoc(groupRef);
 
-            // 2. 그룹 채팅 메시지 삭제 (선택사항)
-            // 메시지가 많을 경우 시간이 걸릴 수 있으므로 백그라운드에서 처리
-            const messagesQuery = query(
-              collection(db, 'groupMessages'),
-              where('groupId', '==', id),
-            );
-            const messagesSnapshot = await getDocs(messagesQuery);
-            const deletePromises = messagesSnapshot.docs.map(doc => deleteDoc(doc.ref));
-            await Promise.all(deletePromises);
+          // 2. 그룹 채팅 메시지 삭제 (선택사항)
+          // 메시지가 많을 경우 시간이 걸릴 수 있으므로 백그라운드에서 처리
+          const messagesQuery = query(
+            collection(db, 'groupMessages'),
+            where('groupId', '==', id),
+          );
+          const messagesSnapshot = await getDocs(messagesQuery);
+          const deletePromises = messagesSnapshot.docs.map(doc => deleteDoc(doc.ref));
+          await Promise.all(deletePromises);
 
-            Alert.alert('삭제 완료', '그룹이 삭제되었습니다.');
+          showSimpleAlert('삭제 완료', '그룹이 삭제되었습니다.', () => {
             router.replace('/(tabs)/group');
-          } catch (error) {
-            console.error('그룹 삭제 실패:', error);
-            Alert.alert('오류', '그룹 삭제에 실패했습니다.');
-          }
-        },
-      },
-    ]);
+          });
+        } catch (error) {
+          console.error('그룹 삭제 실패:', error);
+          showSimpleAlert('오류', '그룹 삭제에 실패했습니다.');
+        }
+      }
+    );
   };
 
   const handleApproveApplication = async (application: Application) => {
@@ -309,35 +363,63 @@ export default function GroupSettingsScreen() {
         status: 'approved',
       });
 
-      Alert.alert('승인 완료', `${application.name}님의 가입을 승인했습니다.`);
+      showSimpleAlert('승인 완료', `${application.name}님의 가입을 승인했습니다.`);
     } catch (error) {
       console.error('승인 실패:', error);
-      Alert.alert('오류', '승인에 실패했습니다.');
+      showSimpleAlert('오류', '승인에 실패했습니다.');
     }
   };
 
-  const handleRejectApplication = async (application: Application) => {
+const handleRejectApplication = async (application: Application) => {
     if (!id) return;
 
-    Alert.alert('지원 거절', `${application.name}님의 지원을 거절하시겠습니까?`, [
-      {text: '취소', style: 'cancel'},
-      {
-        text: '거절',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            const appRef = doc(db, 'groupApplications', application.id);
-            await updateDoc(appRef, {
-              status: 'rejected',
-            });
-            Alert.alert('거절 완료', '지원을 거절했습니다.');
-          } catch (error) {
-            console.error('거절 실패:', error);
-            Alert.alert('오류', '거절에 실패했습니다.');
-          }
-        },
-      },
-    ]);
+    showConfirmAlert(
+      '지원 거절',
+      `${application.name}님의 지원을 거절하시겠습니까?`,
+      async () => {
+        try {
+          const appRef = doc(db, 'groupApplications', application.id);
+          await updateDoc(appRef, {
+            status: 'rejected',
+          });
+          showSimpleAlert('거절 완료', '지원을 거절했습니다.');
+        } catch (error) {
+          console.error('거절 실패:', error);
+          showSimpleAlert('오류', '거절에 실패했습니다.');
+        }
+      }
+    );
+  };
+
+  const handleFollowRequest = async (memberId: string) => {
+    if (!user?.uid) {
+      showSimpleAlert('로그인 필요', '팔로우하려면 로그인이 필요합니다.');
+      return;
+    }
+
+    if (user.uid === memberId) {
+      return; // 자신은 팔로우 불가
+    }
+
+    setFollowLoading(prev => ({...prev, [memberId]: true}));
+
+    try {
+      const isFollowing = followStates[memberId];
+      if (isFollowing) {
+        await userService.unfollowUser(user.uid, memberId);
+        setFollowStates(prev => ({...prev, [memberId]: false}));
+        showSimpleAlert('알림', '언팔로우 했습니다.');
+      } else {
+        await userService.followUser(user.uid, memberId);
+        setFollowStates(prev => ({...prev, [memberId]: true}));
+        showSimpleAlert('알림', '팔로우 했습니다.');
+      }
+    } catch (error) {
+      console.error('팔로우 처리 실패:', error);
+      showSimpleAlert('오류', '팔로우 처리 중 오류가 발생했습니다.');
+    } finally {
+      setFollowLoading(prev => ({...prev, [memberId]: false}));
+    }
   };
 
   const renderMemberItem = (item: UserProfile, index: number) => {
@@ -355,8 +437,24 @@ export default function GroupSettingsScreen() {
           <Text style={styles.memberRole}>{role}</Text>
         </View>
         {!isCurrentUser && (
-          <TouchableOpacity style={styles.followButton}>
-            <Text style={styles.followButtonText}>팔로우</Text>
+          <TouchableOpacity 
+            style={[
+              styles.followButton,
+              followStates[item.uid] && styles.unfollowButton,
+              followLoading[item.uid] && styles.loadingButton
+            ]}
+            onPress={() => handleFollowRequest(item.uid)}
+            disabled={followLoading[item.uid]}>
+            {followLoading[item.uid] ? (
+              <ActivityIndicator size="small" color={BLUE} />
+            ) : (
+              <Text style={[
+                styles.followButtonText,
+                followStates[item.uid] && styles.unfollowButtonText
+              ]}>
+                {followStates[item.uid] ? '언팔로우' : '팔로우'}
+              </Text>
+            )}
           </TouchableOpacity>
         )}
       </View>
@@ -727,10 +825,20 @@ const styles = StyleSheet.create({
     borderColor: BLUE,
     backgroundColor: WHITE,
   },
+  unfollowButton: {
+    borderColor: '#EF4444',
+    backgroundColor: WHITE,
+  },
+  loadingButton: {
+    opacity: 0.7,
+  },
   followButtonText: {
     fontSize: 13,
     fontWeight: '600',
     color: BLUE,
+  },
+  unfollowButtonText: {
+    color: '#EF4444',
   },
   loadingContainer: {
     flexDirection: 'row',

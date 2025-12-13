@@ -53,6 +53,14 @@ type StudyRecord = {
   createdAt?: any;
 };
 
+// [추가됨] 유저 정보 타입 정의
+type UserInfoMap = {
+  [uid: string]: {
+    photoURL?: string;
+    name?: string;
+  };
+};
+
 export default function StudyFeedScreen() {
   const {user} = useAuthContext();
   const {joinedGroupIds} = useGroupContext();
@@ -63,12 +71,32 @@ export default function StudyFeedScreen() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<'all' | 'group' | 'my'>('all');
 
+  // [추가됨] 유저 정보를 저장할 State
+  const [userMap, setUserMap] = useState<UserInfoMap>({});
+
   // 파라미터로 필터 모드 변경
   useEffect(() => {
     if (params.initialFilter) {
       setFilterMode(params.initialFilter as any);
     }
   }, [params.initialFilter]);
+
+  // [추가됨] 유저 정보 실시간 구독 (프로필 사진 매칭용)
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, 'users'), snapshot => {
+      const map: UserInfoMap = {};
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        map[doc.id] = {
+          photoURL: data.photoURL,
+          // name 필드가 없으면 displayName 사용
+          name: data.name || data.displayName, 
+        };
+      });
+      setUserMap(map);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // ===== Firestore 실시간 구독 =====
   useEffect(() => {
@@ -222,15 +250,22 @@ export default function StudyFeedScreen() {
 
     const isMyPost = user?.uid && r.uid === user.uid;
 
+    // [수정됨] userMap에서 최신 유저 정보 가져오기
+    // 게시글에 저장된 정보(r.userPhotoURL)가 있어도 userMap(최신)을 우선 사용
+    const userInfo = r.uid ? userMap[r.uid] : null;
+    const currentPhotoURL = userInfo?.photoURL || r.userPhotoURL;
+    const currentDisplayName = userInfo?.name || r.userDisplayName || '사용자';
+
     return (
       <View key={r.id} style={styles.card}>
         {/* 작성자 정보 */}
         <View style={styles.cardTop}>
           <View style={styles.userInfoRow}>
             <View style={styles.userAvatarPlaceholder}>
-              {r.userPhotoURL && !r.userPhotoURL.startsWith('blob:') ? (
+              {/* [수정됨] 최신 photoURL 사용 및 blob 체크 */}
+              {currentPhotoURL && !currentPhotoURL.startsWith('blob:') ? (
                 <Image
-                  source={{uri: r.userPhotoURL}}
+                  source={{uri: currentPhotoURL}}
                   style={{width: 32, height: 32, borderRadius: 16}}
                 />
               ) : (
@@ -239,7 +274,8 @@ export default function StudyFeedScreen() {
             </View>
             <View>
               <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                <Text style={styles.userName}>{r.userDisplayName || '사용자'}</Text>
+                {/* [수정됨] 최신 이름 사용 */}
+                <Text style={styles.userName}>{currentDisplayName}</Text>
                 {r.studyMode === 'group' && r.groupName && (
                   <Text style={styles.groupNameText}>@{r.groupName}</Text>
                 )}
@@ -305,7 +341,7 @@ export default function StudyFeedScreen() {
             style={[styles.filterBtn, filterMode === 'group' && styles.filterBtnActive]}
             onPress={() => setFilterMode('group')}>
             <Text style={[styles.filterText, filterMode === 'group' && styles.filterTextActive]}>
-              내 그룹 피드
+              그룹 피드
             </Text>
           </TouchableOpacity>
           <TouchableOpacity

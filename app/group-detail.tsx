@@ -7,9 +7,9 @@ import {
   TouchableOpacity,
   useColorScheme,
   FlatList,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
+import {showSimpleAlert} from '@/utils/alert';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useRouter, useNavigation, useLocalSearchParams} from 'expo-router';
 import Button from '@/components/ui/Button';
@@ -161,11 +161,11 @@ export default function GroupDetailScreen() {
 
   const handleJoinGroup = () => {
     if (isAlreadyJoined) {
-      Alert.alert('알림', '이미 가입한 그룹입니다.');
+      showSimpleAlert('알림', '이미 가입한 그룹입니다.');
       return;
     }
     if (hasApplied) {
-      Alert.alert('알림', '이미 지원한 그룹입니다. 승인을 기다려주세요.');
+      showSimpleAlert('알림', '이미 지원한 그룹입니다. 승인을 기다려주세요.');
       return;
     }
     // 지원서 화면으로 이동
@@ -177,7 +177,7 @@ export default function GroupDetailScreen() {
 
   const handleFollowRequest = async (memberId: string) => {
     if (!user?.uid) {
-      Alert.alert('알림', '로그인이 필요합니다.');
+      showSimpleAlert('알림', '로그인이 필요합니다.');
       return;
     }
 
@@ -194,15 +194,15 @@ export default function GroupDetailScreen() {
       if (isCurrentlyFollowing) {
         await userService.unfollowUser(user.uid, memberId);
         setFollowStates(prev => ({...prev, [memberId]: false}));
-        Alert.alert('알림', '언팔로우 했습니다.');
+        showSimpleAlert('알림', '언팔로우 했습니다.');
       } else {
         await userService.followUser(user.uid, memberId);
         setFollowStates(prev => ({...prev, [memberId]: true}));
-        Alert.alert('알림', '팔로우 했습니다.');
+        showSimpleAlert('알림', '팔로우 했습니다.');
       }
     } catch (error) {
       console.error('팔로우 처리 실패:', error);
-      Alert.alert('오류', '팔로우 처리 중 오류가 발생했습니다.');
+      showSimpleAlert('오류', '팔로우 처리 중 오류가 발생했습니다.');
     } finally {
       setFollowLoading(prev => ({...prev, [memberId]: false}));
     }

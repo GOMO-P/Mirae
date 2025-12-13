@@ -171,19 +171,6 @@ export default function SignInScreen() {
               </Text>
               <TextLink href="/select-grade">지금 가입하기.</TextLink>
             </View>
-
-            {/* Social Login */}
-            <View style={styles.socialContainer}>
-              <Text style={[styles.socialText, {color: secondaryTextColor}]}>Or continue with</Text>
-              <View style={styles.socialButtons}>
-                <TouchableOpacity style={[styles.socialButton, {backgroundColor: '#EA4335'}]}>
-                  <Ionicons name="logo-google" size={20} color="white" />
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.socialButton, {backgroundColor: 'black'}]}>
-                  <Ionicons name="logo-apple" size={20} color="white" />
-                </TouchableOpacity>
-              </View>
-            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
