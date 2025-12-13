@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore';
 // 🔹 상대 경로로 수정 (폴더 구조에 맞게)
 import {db} from '../config/firebase';
-import {Alert} from 'react-native';
+import {showSimpleAlert} from '../utils/alert';
 import {useAuthContext} from './AuthContext';
 import {userService, UserProfile} from '../services/userService';
 
@@ -93,7 +93,7 @@ export function GroupProvider({children}: {children: ReactNode}) {
 
     if (!user) {
       console.error('❌ 로그인되지 않음');
-      Alert.alert('로그인 필요', '그룹을 생성하려면 로그인이 필요합니다.');
+      showSimpleAlert('로그인 필요', '그룹을 생성하려면 로그인이 필요합니다.');
       throw new Error('User not authenticated');
     }
 
@@ -122,10 +122,9 @@ export function GroupProvider({children}: {children: ReactNode}) {
       const docRef = await addDoc(collection(db, 'groups'), newGroup);
 
       console.log('✅ 그룹 생성 성공! ID:', docRef.id);
-      Alert.alert('성공', '그룹이 성공적으로 생성되었습니다!');
     } catch (error) {
       console.error('❌ 그룹 생성 실패:', error);
-      Alert.alert('오류', `그룹 생성에 실패했습니다: ${error}`);
+      showSimpleAlert('오류', `그룹 생성에 실패했습니다: ${error}`);
       throw error;
     }
   };
@@ -133,7 +132,7 @@ export function GroupProvider({children}: {children: ReactNode}) {
   // 3. 그룹 가입 함수
   const joinGroup = async (groupId: string) => {
     if (!user) {
-      Alert.alert('로그인 필요', '로그인이 필요합니다.');
+      showSimpleAlert('로그인 필요', '로그인이 필요합니다.');
       return;
     }
 
@@ -161,7 +160,7 @@ export function GroupProvider({children}: {children: ReactNode}) {
       setJoinedGroupIds(prev => [...prev, groupId]);
     } catch (error) {
       console.error('그룹 가입 실패:', error);
-      Alert.alert('오류', '가입에 실패했습니다.');
+      showSimpleAlert('오류', '가입에 실패했습니다.');
     }
   };
 

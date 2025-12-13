@@ -1,5 +1,6 @@
 import React, {useState, useLayoutEffect} from 'react';
-import {View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert} from 'react-native';
+import {View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput} from 'react-native';
+import {showSimpleAlert} from '@/utils/alert';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useRouter, useNavigation, useLocalSearchParams} from 'expo-router';
 import Button from '@/components/ui/Button';
@@ -47,17 +48,17 @@ export default function GroupApplicationScreen() {
 
   const handleSubmit = async () => {
     if (!name || !major || !intro) {
-      Alert.alert('알림', '모든 정보를 입력해주세요.');
+      showSimpleAlert('알림', '모든 정보를 입력해주세요.');
       return;
     }
 
     if (!id) {
-      Alert.alert('오류', '그룹 정보를 찾을 수 없습니다.');
+      showSimpleAlert('오류', '그룹 정보를 찾을 수 없습니다.');
       return;
     }
 
     if (!user) {
-      Alert.alert('로그인 필요', '지원서를 제출하려면 로그인이 필요합니다.');
+      showSimpleAlert('로그인 필요', '지원서를 제출하려면 로그인이 필요합니다.');
       return;
     }
 
@@ -84,7 +85,7 @@ export default function GroupApplicationScreen() {
     } catch (error) {
       console.error('지원서 제출 실패:', error);
       setLoading(false);
-      Alert.alert('오류', '지원서 제출에 실패했습니다.');
+      showSimpleAlert('오류', '지원서 제출에 실패했습니다.');
     }
   };
 

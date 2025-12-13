@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
-import {View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image} from 'react-native';
+import {View, Text, StyleSheet, ScrollView, TouchableOpacity, Image} from 'react-native';
+import {showSimpleAlert, showAlert} from '@/utils/alert';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useRouter, Stack} from 'expo-router';
 import {Ionicons} from '@expo/vector-icons';
@@ -121,7 +122,7 @@ export default function CreateGroupScreen() {
     const {status} = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (status !== 'granted') {
-      Alert.alert('권한 필요', '사진을 선택하려면 갤러리 접근 권한이 필요합니다.');
+      showSimpleAlert('권한 필요', '사진을 선택하려면 갤러리 접근 권한이 필요합니다.');
       return;
     }
 
@@ -139,7 +140,7 @@ export default function CreateGroupScreen() {
 
   const handleCreateGroup = async () => {
     if (!groupName.trim() || !groupDescription.trim()) {
-      Alert.alert('필수 입력', '그룹 이름과 설명을 입력해주세요.');
+      showSimpleAlert('필수 입력', '그룹 이름과 설명을 입력해주세요.');
       return;
     }
 
@@ -168,7 +169,7 @@ export default function CreateGroupScreen() {
       console.log('✅ 그룹 생성 완료');
 
       // 그룹 생성 완료 후 이전 화면으로 돌아가기
-      Alert.alert('그룹 생성 완료', '새로운 그룹이 성공적으로 생성되었습니다!', [
+      showAlert('그룹 생성 완료', '새로운 그룹이 성공적으로 생성되었습니다!', [
         {
           text: '확인',
           onPress: () => router.back(),
@@ -176,7 +177,7 @@ export default function CreateGroupScreen() {
       ]);
     } catch (e) {
       console.error('❌ handleCreateGroup 에러:', e);
-      Alert.alert('오류', '그룹 생성 중 오류가 발생했습니다.');
+      showSimpleAlert('오류', '그룹 생성 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }

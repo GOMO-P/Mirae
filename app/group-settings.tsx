@@ -5,12 +5,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Alert,
   TextInput,
   ActivityIndicator,
   Image,
   Platform,
 } from 'react-native';
+import {showSimpleAlert, showConfirmAlert, showAlert} from '@/utils/alert';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRouter, useLocalSearchParams, Stack} from 'expo-router';
 import {useGroupContext} from '@/contexts/GroupContext';
@@ -159,7 +159,7 @@ export default function GroupSettingsScreen() {
     const {status} = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (status !== 'granted') {
-      Alert.alert('권한 필요', '사진을 선택하려면 갤러리 접근 권한이 필요합니다.');
+      showSimpleAlert('권한 필요', '사진을 선택하려면 갤러리 접근 권한이 필요합니다.');
       return;
     }
 
@@ -202,17 +202,17 @@ export default function GroupSettingsScreen() {
 
   const handleUpdateGroupImage = async () => {
     if (!id) {
-      Alert.alert('오류', '그룹 정보를 찾을 수 없습니다.');
+      showSimpleAlert('오류', '그룹 정보를 찾을 수 없습니다.');
       return;
     }
 
     if (!isCreator) {
-      Alert.alert('권한 없음', '그룹 생성자만 이미지를 변경할 수 있습니다.');
+      showSimpleAlert('권한 없음', '그룹 생성자만 이미지를 변경할 수 있습니다.');
       return;
     }
 
     if (!newGroupImage) {
-      Alert.alert('오류', '이미지를 선택해주세요.');
+      showSimpleAlert('오류', '이미지를 선택해주세요.');
       return;
     }
 
@@ -240,12 +240,12 @@ export default function GroupSettingsScreen() {
         imageUrl: imageUrl,
       });
 
-      Alert.alert('성공', '그룹 이미지가 변경되었습니다.');
+      showSimpleAlert('성공', '그룹 이미지가 변경되었습니다.');
       setIsEditingImage(false);
       setNewGroupImage(imageUrl); // 업로드된 URL로 업데이트
     } catch (error) {
       console.error('그룹 이미지 변경 실패:', error);
-      Alert.alert('오류', '그룹 이미지 변경에 실패했습니다.');
+      showSimpleAlert('오류', '그룹 이미지 변경에 실패했습니다.');
     } finally {
       setUpdating(false);
     }
@@ -253,12 +253,12 @@ export default function GroupSettingsScreen() {
 
   const handleUpdateGroupName = async () => {
     if (!id || !newGroupName.trim()) {
-      Alert.alert('오류', '그룹 이름을 입력해주세요.');
+      showSimpleAlert('오류', '그룹 이름을 입력해주세요.');
       return;
     }
 
     if (!isCreator) {
-      Alert.alert('권한 없음', '그룹 생성자만 이름을 변경할 수 있습니다.');
+      showSimpleAlert('권한 없음', '그룹 생성자만 이름을 변경할 수 있습니다.');
       return;
     }
 
@@ -269,11 +269,11 @@ export default function GroupSettingsScreen() {
         name: newGroupName.trim(),
       });
 
-      Alert.alert('성공', '그룹 이름이 변경되었습니다.');
+      showSimpleAlert('성공', '그룹 이름이 변경되었습니다.');
       setIsEditingName(false);
     } catch (error) {
       console.error('그룹 이름 변경 실패:', error);
-      Alert.alert('오류', '그룹 이름 변경에 실패했습니다.');
+      showSimpleAlert('오류', '그룹 이름 변경에 실패했습니다.');
     } finally {
       setUpdating(false);
     }
@@ -283,74 +283,67 @@ export default function GroupSettingsScreen() {
     if (!user || !id) return;
 
     if (isCreator) {
-      Alert.alert('그룹 탈퇴 불가', '그룹 생성자는 탈퇴할 수 없습니다. 그룹을 삭제하시겠습니까?', [
-        {text: '취소', style: 'cancel'},
-        {
-          text: '삭제',
-          style: 'destructive',
-          onPress: handleDeleteGroup,
-        },
-      ]);
+      showConfirmAlert(
+        '그룹 탈퇴 불가', 
+        '그룹 생성자는 탈퇴할 수 없습니다. 그룹을 삭제하시겠습니까?',
+        handleDeleteGroup
+      );
       return;
     }
 
-    Alert.alert('그룹 탈퇴', '정말 이 그룹에서 탈퇴하시겠습니까?', [
-      {text: '취소', style: 'cancel'},
-      {
-        text: '탈퇴',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            const groupRef = doc(db, 'groups', id);
-            await updateDoc(groupRef, {
-              members: arrayRemove(user.uid),
-              currentMembers: increment(-1),
-            });
+    showConfirmAlert(
+      '그룹 탈퇴', 
+      '정말 이 그룹에서 탈퇴하시겠습니까?',
+      async () => {
+        try {
+          const groupRef = doc(db, 'groups', id);
+          await updateDoc(groupRef, {
+            members: arrayRemove(user.uid),
+            currentMembers: increment(-1),
+          });
 
-            Alert.alert('탈퇴 완료', '그룹에서 탈퇴했습니다.');
+          showSimpleAlert('탈퇴 완료', '그룹에서 탈퇴했습니다.', () => {
             router.replace('/(tabs)/group');
-          } catch (error) {
-            console.error('그룹 탈퇴 실패:', error);
-            Alert.alert('오류', '그룹 탈퇴에 실패했습니다.');
-          }
-        },
-      },
-    ]);
+          });
+        } catch (error) {
+          console.error('그룹 탈퇴 실패:', error);
+          showSimpleAlert('오류', '그룹 탈퇴에 실패했습니다.');
+        }
+      }
+    );
   };
 
   const handleDeleteGroup = async () => {
     if (!id) return;
 
-    Alert.alert('그룹 삭제', '정말 이 그룹을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.', [
-      {text: '취소', style: 'cancel'},
-      {
-        text: '삭제',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            // 1. 그룹 문서 삭제
-            const groupRef = doc(db, 'groups', id);
-            await deleteDoc(groupRef);
+    showConfirmAlert(
+      '그룹 삭제', 
+      '정말 이 그룹을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
+      async () => {
+        try {
+          // 1. 그룹 문서 삭제
+          const groupRef = doc(db, 'groups', id);
+          await deleteDoc(groupRef);
 
-            // 2. 그룹 채팅 메시지 삭제 (선택사항)
-            // 메시지가 많을 경우 시간이 걸릴 수 있으므로 백그라운드에서 처리
-            const messagesQuery = query(
-              collection(db, 'groupMessages'),
-              where('groupId', '==', id),
-            );
-            const messagesSnapshot = await getDocs(messagesQuery);
-            const deletePromises = messagesSnapshot.docs.map(doc => deleteDoc(doc.ref));
-            await Promise.all(deletePromises);
+          // 2. 그룹 채팅 메시지 삭제 (선택사항)
+          // 메시지가 많을 경우 시간이 걸릴 수 있으므로 백그라운드에서 처리
+          const messagesQuery = query(
+            collection(db, 'groupMessages'),
+            where('groupId', '==', id),
+          );
+          const messagesSnapshot = await getDocs(messagesQuery);
+          const deletePromises = messagesSnapshot.docs.map(doc => deleteDoc(doc.ref));
+          await Promise.all(deletePromises);
 
-            Alert.alert('삭제 완료', '그룹이 삭제되었습니다.');
+          showSimpleAlert('삭제 완료', '그룹이 삭제되었습니다.', () => {
             router.replace('/(tabs)/group');
-          } catch (error) {
-            console.error('그룹 삭제 실패:', error);
-            Alert.alert('오류', '그룹 삭제에 실패했습니다.');
-          }
-        },
-      },
-    ]);
+          });
+        } catch (error) {
+          console.error('그룹 삭제 실패:', error);
+          showSimpleAlert('오류', '그룹 삭제에 실패했습니다.');
+        }
+      }
+    );
   };
 
   const handleApproveApplication = async (application: Application) => {
@@ -370,65 +363,37 @@ export default function GroupSettingsScreen() {
         status: 'approved',
       });
 
-      Alert.alert('승인 완료', `${application.name}님의 가입을 승인했습니다.`);
+      showSimpleAlert('승인 완료', `${application.name}님의 가입을 승인했습니다.`);
     } catch (error) {
       console.error('승인 실패:', error);
-      Alert.alert('오류', '승인에 실패했습니다.');
+      showSimpleAlert('오류', '승인에 실패했습니다.');
     }
   };
 
 const handleRejectApplication = async (application: Application) => {
     if (!id) return;
 
-    // 1. 실제 거절 로직을 수행하는 함수 (웹/앱 공통 사용)
-    const executeReject = async () => {
-      try {
-        const appRef = doc(db, 'groupApplications', application.id);
-        await updateDoc(appRef, {
-          status: 'rejected',
-        });
-        
-        // 성공 알림 분기
-        if (Platform.OS === 'web') {
-          window.alert('거절 완료: 지원을 거절했습니다.');
-        } else {
-          Alert.alert('거절 완료', '지원을 거절했습니다.');
-        }
-      } catch (error) {
-        console.error('거절 실패:', error);
-        
-        // 실패 알림 분기
-        if (Platform.OS === 'web') {
-          window.alert('오류: 거절에 실패했습니다.');
-        } else {
-          Alert.alert('오류', '거절에 실패했습니다.');
+    showConfirmAlert(
+      '지원 거절',
+      `${application.name}님의 지원을 거절하시겠습니까?`,
+      async () => {
+        try {
+          const appRef = doc(db, 'groupApplications', application.id);
+          await updateDoc(appRef, {
+            status: 'rejected',
+          });
+          showSimpleAlert('거절 완료', '지원을 거절했습니다.');
+        } catch (error) {
+          console.error('거절 실패:', error);
+          showSimpleAlert('오류', '거절에 실패했습니다.');
         }
       }
-    };
-
-    // 2. 플랫폼에 따른 확인 창 분기 처리
-    if (Platform.OS === 'web') {
-      // ✅ 웹: 브라우저 기본 confirm 창 사용
-      const isConfirmed = window.confirm(`${application.name}님의 지원을 거절하시겠습니까?`);
-      if (isConfirmed) {
-        await executeReject();
-      }
-    } else {
-      // ✅ 앱(iOS/Android): Native Alert 사용
-      Alert.alert('지원 거절', `${application.name}님의 지원을 거절하시겠습니까?`, [
-        {text: '취소', style: 'cancel'},
-        {
-          text: '거절',
-          style: 'destructive',
-          onPress: executeReject, // 분리해둔 로직 함수 실행
-        },
-      ]);
-    }
+    );
   };
 
   const handleFollowRequest = async (memberId: string) => {
     if (!user?.uid) {
-      Alert.alert('로그인 필요', '팔로우하려면 로그인이 필요합니다.');
+      showSimpleAlert('로그인 필요', '팔로우하려면 로그인이 필요합니다.');
       return;
     }
 
@@ -443,15 +408,15 @@ const handleRejectApplication = async (application: Application) => {
       if (isFollowing) {
         await userService.unfollowUser(user.uid, memberId);
         setFollowStates(prev => ({...prev, [memberId]: false}));
-        Alert.alert('알림', '언팔로우 했습니다.');
+        showSimpleAlert('알림', '언팔로우 했습니다.');
       } else {
         await userService.followUser(user.uid, memberId);
         setFollowStates(prev => ({...prev, [memberId]: true}));
-        Alert.alert('알림', '팔로우 했습니다.');
+        showSimpleAlert('알림', '팔로우 했습니다.');
       }
     } catch (error) {
       console.error('팔로우 처리 실패:', error);
-      Alert.alert('오류', '팔로우 처리 중 오류가 발생했습니다.');
+      showSimpleAlert('오류', '팔로우 처리 중 오류가 발생했습니다.');
     } finally {
       setFollowLoading(prev => ({...prev, [memberId]: false}));
     }
