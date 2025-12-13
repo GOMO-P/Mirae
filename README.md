@@ -48,18 +48,16 @@ GOMO는 사용자들이 다양한 주제의 그룹을 만들고, 검색하고, �
 
 ```
 Mirae
-├── .gitignore                      # Git 버전 관리에서 제외할 파일/폴더 목록 설정
+├── .gitignore                      
 ├── .prettierrc                     # 코드 스타일 자동 정리(Format) 설정 파일
-├── .vscode                         # VS Code 에디터 전용 설정 폴더
-│   ├── extensions.json             # 프로젝트 추천 확장 프로그램 목록
-│   └── settings.json               # 프로젝트 전용 에디터 설정
-├── README.md                       # 프로젝트에 대한 설명과 실행 방법을 적는 문서
+├── .vscode                                     
+├── README.md                       # 프로젝트에 대한 설명
 ├── app.json                        # Expo 앱의 이름, 버전, 아이콘 등 전체 설정 파일
-├── app                             # [핵심] 앱의 화면과 라우팅을 담당하는 폴더 (File-based Routing)
+├── app                             # 앱의 화면과 라우팅을 담당하는 폴더
 │   ├── (tabs)                      # 하단 탭 네비게이션에 포함되는 화면들
 │   │   ├── _layout.tsx             # 탭 네비게이션의 구조와 아이콘 설정
-│   │   ├── chat.tsx                # 채팅 목록 탭 화면
-│   │   ├── explore.tsx             # 탐색(둘러보기) 탭 화면
+│   │   ├── chat.tsx                # 채팅 목록 화면
+│   │   ├── explore.tsx             # 탐색 탭 화면
 │   │   ├── group.tsx               # 내 그룹 목록 탭 화면
 │   │   ├── index.tsx               # 앱의 메인(홈) 화면
 │   │   ├── profile.tsx             # 내 프로필 탭 화면
@@ -67,10 +65,10 @@ Mirae
 │   │   ├── study-cert.tsx          # 공부 인증 화면
 │   │   └── study-feed.tsx          # 공부 피드 화면
 │   ├── chat
-│   │   └── [id].tsx                # 개별 채팅방 상세 화면 (동적 라우팅)
+│   │   └── [id].tsx                # 개별 채팅방 상세 화면
 │   ├── rooms
-│   │   └── [roomid].tsx            # 스터디룸/방 상세 화면 (동적 라우팅)
-│   ├── _layout.tsx                 # 앱 전체의 레이아웃 (Stack 네비게이션 등 설정)
+│   │   └── [roomid].tsx            # 스터디룸/방 상세 화면
+│   ├── _layout.tsx                 # 앱 전체의 레이아웃
 │   ├── create-group.tsx            # 새 그룹 만들기 화면
 │   ├── customer-center.tsx         # 고객 센터 화면
 │   ├── delete-account.tsx          # 회원 탈퇴 화면
