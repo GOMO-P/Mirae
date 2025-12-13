@@ -6,11 +6,34 @@ import Button from '@/components/ui/Button';
 import GroupListItem from '@/components/ui/GroupListItem';
 import {Colors, Typography, Spacing, BorderRadius} from '@/constants/design-tokens';
 import {Ionicons} from '@expo/vector-icons';
+import {useGroupContext} from '@/contexts/GroupContext';
+
+// 추천 그룹 Mock Data
+const RECOMMENDED_GROUPS = [
+  {
+    id: 'rec1',
+    name: '정보처리기사 자격증 반',
+    description: '정처기 따는 사람 모두 모여!',
+    currentMembers: 20,
+    maxMembers: 50,
+  },
+  {
+    id: 'rec2',
+    name: '토익 900점 목표 반',
+    description: '매일 아침 단어 시험 봅니다.',
+    currentMembers: 15,
+    maxMembers: 30,
+  },
+];
 
 export default function JoinCompleteScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  
+  // 실제 그룹 데이터에서 추천 그룹 가져오기
+  const {getPopularGroups} = useGroupContext();
+  const recommendedGroups = getPopularGroups().slice(0, 3); // 인기 그룹 중 상위 3개
 
   // 헤더 숨김
   useLayoutEffect(() => {
@@ -20,7 +43,7 @@ export default function JoinCompleteScreen() {
   }, [navigation]);
 
   const handleContinue = () => {
-    // 홈(Explore)으로 돌아가기
+    // 메인 화면(Explore 탭)으로 이동
     router.dismissAll();
     router.replace('/(tabs)');
   };
@@ -34,9 +57,9 @@ export default function JoinCompleteScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleCancel}>
-          <Text style={styles.cancelText}>Cancel</Text>
+          <Text style={styles.cancelText}>취소</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>참가 완료</Text>
+        <Text style={styles.headerTitle}>지원 완료</Text>
         <View style={{width: 50}} />
       </View>
 
@@ -59,36 +82,44 @@ export default function JoinCompleteScreen() {
             <View style={[styles.stepCircle, styles.stepActive]}>
               <Ionicons name="checkmark" size={16} color="#fff" />
             </View>
-            <Text style={[styles.stepText, styles.stepTextActive]}>참가 완료</Text>
+            <Text style={[styles.stepText, styles.stepTextActive]}>지원 완료</Text>
           </View>
         </View>
 
         {/* Success Message */}
         <View style={styles.messageContainer}>
-          <Text style={styles.mainMessage}>정상적으로 스터디 지원이 완료되었어요 ✅</Text>
-          <Text style={styles.subMessage}>스터디 가입 완료되었어요!</Text>
+          <Text style={styles.mainMessage}>지원서 제출이 완료되었어요 ✅</Text>
+          <Text style={styles.subMessage}>스터디 그룹 지원서가 성공적으로 제출되었습니다!</Text>
         </View>
 
         {/* Recommendation Section */}
-        <View style={styles.recommendationSection}>
-          <Text style={styles.recommendationTitle}>이런 스터디 그룹은 어떠세요?</Text>
+        {recommendedGroups.length > 0 && (
+          <View style={styles.recommendationSection}>
+            <Text style={styles.recommendationTitle}>이런 스터디 그룹은 어떠세요?</Text>
 
-          {RECOMMENDED_GROUPS.map(group => (
-            <GroupListItem
-              key={group.id}
-              group={group}
-              onPress={() => {}} // 추천 그룹 클릭 시 동작 (필요 시 구현)
-              isDark={false} // 배경이 흰색이므로 라이트 모드 스타일 적용
-            />
-          ))}
-        </View>
+            {recommendedGroups.map(group => (
+              <GroupListItem
+                key={group.id}
+                group={group}
+                onPress={() => {
+                  // 추천 그룹 클릭 시 그룹 상세 페이지로 이동
+                  router.push({
+                    pathname: '/group-detail',
+                    params: {id: group.id},
+                  });
+                }}
+                isDark={false} // 배경이 흰색이므로 라이트 모드 스타일 적용
+              />
+            ))}
+          </View>
+        )}
 
         <View style={{height: 40}} />
       </ScrollView>
 
       {/* Footer */}
       <View style={[styles.footer, {paddingBottom: insets.bottom + Spacing.md}]}>
-        <Button title="Continue" onPress={handleContinue} fullWidth size="md" />
+        <Button title="완료" onPress={handleContinue} fullWidth size="md" />
       </View>
     </SafeAreaView>
   );

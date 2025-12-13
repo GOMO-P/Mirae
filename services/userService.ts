@@ -69,14 +69,19 @@ export const userService = {
       const docRef = doc(db, USERS_COLLECTION, uid);
       const docSnap = await getDoc(docRef);
 
+      // undefined 값들을 제거하여 Firestore 오류 방지
+      const cleanData = Object.fromEntries(
+        Object.entries(data).filter(([_, value]) => value !== undefined)
+      );
+
       if (docSnap.exists()) {
         await updateDoc(docRef, {
-          ...data,
+          ...cleanData,
           updatedAt: new Date(),
         });
       } else {
         await setDoc(docRef, {
-          ...data,
+          ...cleanData,
           uid,
           createdAt: new Date(),
           updatedAt: new Date(),

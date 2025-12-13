@@ -185,9 +185,6 @@ export default function GroupChatScreen() {
 
         {/* 입력 영역 */}
         <View style={styles.inputContainer}>
-          <TouchableOpacity style={styles.plusButton}>
-            <Text style={styles.plusText}>+</Text>
-          </TouchableOpacity>
           <TextInput
             style={styles.input}
             placeholder="Type a message..."
@@ -317,20 +314,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: LIGHT_GRAY,
   },
-  plusButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: BLUE,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  plusText: {
-    color: WHITE,
-    fontSize: 20,
-    fontWeight: '600',
-  },
+
   input: {
     flex: 1,
     height: 40,
@@ -341,9 +325,9 @@ const styles = StyleSheet.create({
     color: TEXT_DARK,
     borderWidth: 1,
     borderColor: LIGHT_GRAY,
+    marginRight: 8,
   },
   sendButton: {
-    marginLeft: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
     backgroundColor: BLUE,
