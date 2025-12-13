@@ -78,7 +78,7 @@
 1. **의존성 설치**
 
    ```bash
-   git clone [https://github.com/gomo-p/mirae.git](https://github.com/gomo-p/mirae.git)
+   git clone https://github.com/gomo-p/mirae.git
    cd mirae
    ```
 
