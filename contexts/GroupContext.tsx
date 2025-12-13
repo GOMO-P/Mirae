@@ -98,15 +98,26 @@ export function GroupProvider({children}: {children: ReactNode}) {
     }
 
     try {
+      console.log('🔹 사용자 프로필 확인 중...');
       // 사용자 프로필이 없으면 생성
       const userProfile = await userService.getUserProfile(user.uid);
+      console.log('🔹 사용자 프로필:', userProfile);
+      
       if (!userProfile) {
-        await userService.updateUserProfile(user.uid, {
+        console.log('🔹 사용자 프로필 생성 중...');
+        const profileData: any = {
           uid: user.uid,
           email: user.email || '',
           displayName: user.displayName || user.email || '익명',
-          photoURL: user.photoURL || undefined,
-        });
+        };
+        
+        // photoURL이 있을 때만 추가 (undefined 방지)
+        if (user.photoURL) {
+          profileData.photoURL = user.photoURL;
+        }
+        
+        await userService.updateUserProfile(user.uid, profileData);
+        console.log('🔹 사용자 프로필 생성 완료');
       }
 
       const newGroup = {
@@ -124,7 +135,11 @@ export function GroupProvider({children}: {children: ReactNode}) {
       console.log('✅ 그룹 생성 성공! ID:', docRef.id);
     } catch (error) {
       console.error('❌ 그룹 생성 실패:', error);
-      showSimpleAlert('오류', `그룹 생성에 실패했습니다: ${error}`);
+      console.error('❌ 오류 상세:', error.message);
+      console.error('❌ 오류 스택:', error.stack);
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      showSimpleAlert('오류', `그룹 생성에 실패했습니다: ${errorMessage}`);
       throw error;
     }
   };

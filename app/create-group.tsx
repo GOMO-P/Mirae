@@ -177,7 +177,11 @@ export default function CreateGroupScreen() {
       ]);
     } catch (e) {
       console.error('❌ handleCreateGroup 에러:', e);
-      showSimpleAlert('오류', '그룹 생성 중 오류가 발생했습니다.');
+      console.error('❌ 에러 타입:', typeof e);
+      console.error('❌ 에러 메시지:', e instanceof Error ? e.message : String(e));
+      
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      showSimpleAlert('오류', `그룹 생성 중 오류가 발생했습니다: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
