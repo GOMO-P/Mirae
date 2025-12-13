@@ -15,7 +15,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRouter, useLocalSearchParams, Stack} from 'expo-router';
 import {useGroupContext} from '@/contexts/GroupContext';
 import {useAuthContext} from '@/contexts/AuthContext';
-import {UserProfile} from '@/services/userService';
+import {UserProfile, userService} from '@/services/userService';
 import {
   doc,
   updateDoc,
@@ -80,6 +80,8 @@ export default function GroupSettingsScreen() {
   const [updating, setUpdating] = useState(false);
   const [applications, setApplications] = useState<Application[]>([]);
   const [loadingApplications, setLoadingApplications] = useState(true);
+  const [followStates, setFollowStates] = useState<{[key: string]: boolean}>({});
+  const [followLoading, setFollowLoading] = useState<{[key: string]: boolean}>({});
 
   const currentGroup = groups.find(g => g.id === id);
   const isCreator = currentGroup?.createdBy === user?.uid;
@@ -93,6 +95,17 @@ export default function GroupSettingsScreen() {
       try {
         const memberProfiles = await getGroupMembers(id);
         setMembers(memberProfiles);
+
+        // 팔로우 상태 확인
+        if (user?.uid && memberProfiles.length > 0) {
+          const followingList = await userService.getFollowing(user.uid);
+          const followingIds = followingList.map(u => u.uid);
+          const initialFollowStates: {[key: string]: boolean} = {};
+          memberProfiles.forEach(member => {
+            initialFollowStates[member.uid] = followingIds.includes(member.uid);
+          });
+          setFollowStates(initialFollowStates);
+        }
       } catch (error) {
         console.error('멤버 정보 로드 실패:', error);
       } finally {
@@ -101,7 +114,7 @@ export default function GroupSettingsScreen() {
     };
 
     fetchMembers();
-  }, [id, getGroupMembers]);
+  }, [id, getGroupMembers, user]);
 
   // 지원서 실시간 구독
   useEffect(() => {
@@ -413,6 +426,37 @@ const handleRejectApplication = async (application: Application) => {
     }
   };
 
+  const handleFollowRequest = async (memberId: string) => {
+    if (!user?.uid) {
+      Alert.alert('로그인 필요', '팔로우하려면 로그인이 필요합니다.');
+      return;
+    }
+
+    if (user.uid === memberId) {
+      return; // 자신은 팔로우 불가
+    }
+
+    setFollowLoading(prev => ({...prev, [memberId]: true}));
+
+    try {
+      const isFollowing = followStates[memberId];
+      if (isFollowing) {
+        await userService.unfollowUser(user.uid, memberId);
+        setFollowStates(prev => ({...prev, [memberId]: false}));
+        Alert.alert('알림', '언팔로우 했습니다.');
+      } else {
+        await userService.followUser(user.uid, memberId);
+        setFollowStates(prev => ({...prev, [memberId]: true}));
+        Alert.alert('알림', '팔로우 했습니다.');
+      }
+    } catch (error) {
+      console.error('팔로우 처리 실패:', error);
+      Alert.alert('오류', '팔로우 처리 중 오류가 발생했습니다.');
+    } finally {
+      setFollowLoading(prev => ({...prev, [memberId]: false}));
+    }
+  };
+
   const renderMemberItem = (item: UserProfile, index: number) => {
     const role = index === 0 ? '방장' : '팀원';
     const isCurrentUser = user?.uid === item.uid;
@@ -428,8 +472,24 @@ const handleRejectApplication = async (application: Application) => {
           <Text style={styles.memberRole}>{role}</Text>
         </View>
         {!isCurrentUser && (
-          <TouchableOpacity style={styles.followButton}>
-            <Text style={styles.followButtonText}>팔로우</Text>
+          <TouchableOpacity 
+            style={[
+              styles.followButton,
+              followStates[item.uid] && styles.unfollowButton,
+              followLoading[item.uid] && styles.loadingButton
+            ]}
+            onPress={() => handleFollowRequest(item.uid)}
+            disabled={followLoading[item.uid]}>
+            {followLoading[item.uid] ? (
+              <ActivityIndicator size="small" color={BLUE} />
+            ) : (
+              <Text style={[
+                styles.followButtonText,
+                followStates[item.uid] && styles.unfollowButtonText
+              ]}>
+                {followStates[item.uid] ? '언팔로우' : '팔로우'}
+              </Text>
+            )}
           </TouchableOpacity>
         )}
       </View>
@@ -800,10 +860,20 @@ const styles = StyleSheet.create({
     borderColor: BLUE,
     backgroundColor: WHITE,
   },
+  unfollowButton: {
+    borderColor: '#EF4444',
+    backgroundColor: WHITE,
+  },
+  loadingButton: {
+    opacity: 0.7,
+  },
   followButtonText: {
     fontSize: 13,
     fontWeight: '600',
     color: BLUE,
+  },
+  unfollowButtonText: {
+    color: '#EF4444',
   },
   loadingContainer: {
     flexDirection: 'row',
