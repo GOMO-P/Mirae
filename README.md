@@ -74,7 +74,7 @@
 
 ### 설치 및 실행
 
-1. **의존성 설치**
+1. **프로젝트 클론**
 
    ```bash
    git clone https://github.com/gomo-p/mirae.git
