@@ -176,6 +176,7 @@ Mirae
 │   │   ├── collapsible.tsx         # 접었다 폈다 할 수 있는 뷰 컴포넌트
 │   │   └── icon-symbol.tsx         # 아이콘 표시용 심볼 컴포넌트
 │   ├── Comments.tsx                # 댓글 목록 및 작성 컴포넌트
+│   ├── haptic-tab.tsx              # 햅틱 반응이 있는 탭 컴포넌트
 │   ├── NotificationListener.tsx    # 알림 수신을 처리하는 리스너 컴포넌트
 │   ├── external-link.tsx           # 외부 링크 연결 컴포넌트
 │   ├── hello-wave.tsx              # 환영 애니메이션 (손 흔들기) 컴포넌트
